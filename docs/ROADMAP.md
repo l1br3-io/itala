@@ -17,6 +17,14 @@ The initial release focuses on a solid foundation with a curated set of built-in
 - Basic theming and command palette
 - Plugin installation from a curated repository
 
+**MVP shipping criteria:**
+
+- All kernel and plugin-host code arrived via RED-GREEN-REFACTOR ([workflow rules](../.claude/rules/workflow.md))
+- ≥70% mutation score on `itala-kernel` and `itala-plugin-host` ([testing rules](../.claude/rules/rust/testing.md))
+- Doctest on every public function in `itala-plugin-api` (the semver-frozen surface)
+- `just lint test deny` green on every merge to `main`
+- Desktop shell is not started until `itala-cli` exercises every kernel + plugin-host capability end-to-end via TDD
+
 **Deferred to post-MVP:**
 
 - Real-time collaboration
@@ -33,10 +41,12 @@ Itala targets consistent behavior across every platform, rolled out in stages:
 
 | Phase | Platform | Notes |
 |---|---|---|
-| MVP | **Desktop** (Tauri) | Full system integration: tray, deep links, file watching. First platform to ship. |
-| MVP | **CLI** | Scripting, batch operations, headless environments. |
+| MVP-α | **CLI** | First surface to ship. Exercises kernel + plugin-host end-to-end; scripting, batch operations, headless environments. |
+| MVP-β | **Desktop** (Tauri) | Begins only after MVP-α is green. Full system integration: tray, deep links, file watching. |
 | Post-MVP | **Web** | Progressive Web App with IndexedDB / OPFS storage. |
 | Post-MVP | **Mobile** (iOS, Android) | Native apps with share extensions and background sync. |
+
+**MVP-α exit trigger:** a CLI user can create a vault, write linked notes across a week of daily use, install one plugin from the curated repo, and search/backlink across the result — entirely from the CLI. This is a user-shaped finish line, not a feature-list finish line: the smallest demonstration that the kernel and plugin contract compose into a working knowledge management system. MVP-β does not begin until this trigger is met.
 
 ---
 

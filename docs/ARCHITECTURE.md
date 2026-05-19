@@ -10,7 +10,7 @@ For the high-level vision see the [README](../README.md); for delivery phasing s
 
 ### 1.1 Vaults and Notes
 
-A **vault** is a logical container of notes, assets, and configuration. By default it maps to a folder on the local filesystem, but the physical storage is pluggable via the VFS abstraction — backends such as S3, IndexedDB (web), or a database can be provided by a Storage plugin without changing any other part of the system.
+A **vault** is a logical container of notes, assets, and configuration. By default it maps to a folder on the local filesystem, but the physical storage is pluggable via the VFS abstraction — backends such as S3, IndexedDB (web), WebDAV, or a database can be provided by a Storage plugin without changing any other part of the system.
 
 - Users can create, open, and switch between multiple vaults.
 - Vault metadata and settings are stored in a `.itala` subfolder (or equivalent location in non-filesystem backends).
@@ -45,7 +45,7 @@ The system automatically builds and maintains a graph of note relationships.
 - Graph visualization (as a separate plugin) showing nodes and connections.
 - Link resolution works across vaults and external references (URLs).
 
-### 1.4 Search and Discovery
+### 1.4 Search and Discovery (Plugin)
 
 Users can quickly find notes by content or metadata.
 
@@ -118,8 +118,9 @@ Users can share their work in various formats.
 |---|---|
 | Editor | Extends or replaces the note editor (e.g., Vim mode, WYSIWYG). |
 | Theme | CSS custom properties and styling rules. |
-| Storage | Implements a VFS backend (local, S3, IndexedDB). |
+| Storage | Implements a VFS backend (local, S3, IndexedDB, WebDAV). |
 | Sync | Provides a sync transport and conflict resolver. |
+| Search | Implements the search index and query interface (e.g., full-text, semantic). |
 | AI Provider | Implements the LLM/embedding provider trait. |
 | Exporter | Adds new export formats or templates. |
 | Command | Adds CLI subcommands or command palette actions. |
@@ -166,6 +167,7 @@ Users can share their work in various formats.
 
 | Platform | Primary Language | UI Layer | Storage |
 |---|---|---|---|
+| CLI | Rust | Terminal | Local filesystem |
 | Desktop | Rust (Tauri) | Webview (TypeScript) | Local filesystem |
 | Web | Rust (WASM) | Browser DOM | IndexedDB / OPFS |
 | Android | Kotlin + Rust (JNI) | Webview or Native | Scoped Storage |

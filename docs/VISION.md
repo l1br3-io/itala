@@ -21,7 +21,7 @@ Plugins are discoverable, installable, and composable. Users can replace or exte
 
 ### Local-First, Cloud-Optional
 
-All core functionality works entirely offline. The user's data lives in plain files (Markdown with YAML frontmatter) in a folder of their choice. Syncing and cloud features are optional plugins. The user controls where their data resides.
+All core functionality works entirely offline. The user's data lives wherever they choose — plain Markdown files in a local folder by default, but the storage layer is pluggable: a Storage plugin can back a vault with a database, an S3 bucket, IndexedDB in the browser, or any other backend. Syncing and cloud features are optional plugins. The user controls where their data resides and in what form.
 
 ### Extensible Knowledge Graph
 
