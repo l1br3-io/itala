@@ -43,7 +43,8 @@
       "Bash(pre-commit:*)",
       "Bash(echo \"exit:$?\")",
       "Bash(echo \"exit: $?\")",
-      "Read(//home/jpt/.claude/**)"
+      "Read(//home/jpt/.claude/**)",
+      "Bash(RUSTDOCFLAGS=\"-D warnings\" cargo doc --no-deps -p itala-kernel)"
     ]
   },
   "enableAllProjectMcpServers": true,

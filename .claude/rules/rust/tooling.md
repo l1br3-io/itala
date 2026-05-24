@@ -6,7 +6,7 @@
 
 ```toml
 [toolchain]
-channel = "1.84.0"
+channel = "1.93.0"
 components = ["rustfmt", "clippy", "llvm-tools-preview"]
 targets = ["wasm32-wasip2", "x86_64-unknown-linux-gnu"]
 ```
@@ -19,12 +19,9 @@ Pin the channel. Bump deliberately, with a CI run, and update this file in the s
 
 ```toml
 edition = "2024"
-imports_granularity = "Module"
-group_imports = "StdExternalCrate"
-reorder_imports = true
 use_field_init_shorthand = true
 use_try_shorthand = true
-unstable_features = true
+reorder_imports = true
 ```
 
 CI runs `cargo fmt --all -- --check`. Local pre-commit runs `cargo fmt`. Never check in unformatted code.
@@ -90,6 +87,8 @@ The repo ships a `justfile` (or `make` if preferred) with the canonical shortcut
 
 ```just
 default: lint test
+
+ci: lint test deny doc
 
 fmt:
     cargo fmt --all

@@ -31,7 +31,8 @@ The planner agent will:
 3. **Identify dependencies** between components
 4. **Assess risks** and potential blockers
 5. **Estimate complexity** (High/Medium/Low)
-6. **Present the plan** and WAIT for your explicit confirmation
+6. **Save the plan** to `.claude/plans/` with a stable ID (see § Plan File below)
+7. **Present the plan** and WAIT for your explicit confirmation
 
 ## Example Usage
 
@@ -95,6 +96,50 @@ Agent (planner):
 **WAITING FOR CONFIRMATION**: Proceed with this plan? (yes/no/modify)
 ```
 
+## Plan File
+
+Every plan is saved to `.claude/plans/` **before** asking for confirmation so it survives a lost terminal. It is a **working document** — active only while the feature is in flight. When `/sprint-update <F#> completed` runs, the file is deleted automatically.
+
+### Naming
+
+| Situation | File name |
+|---|---|
+| Sprint feature in scope | `<feature-id>_<slug>.md` → `F3_kernel-vfs.md` |
+| No sprint feature | `<YYYY-MM-DD>_<slug>.md` → `2026-05-24_backlinks-panel.md` |
+
+Slug: 2–4 words from the task description, kebab-cased.
+
+### Format
+
+```markdown
+---
+id: F3_kernel-vfs
+feature: F3          # omit if no sprint feature
+date: 2026-05-24
+status: draft        # draft | confirmed | in-progress
+---
+
+# Plan: <title>
+
+## Requirements
+…
+
+## Steps
+…
+
+## Risks
+…
+
+## Success Criteria
+- [ ] …
+```
+
+Status values while active: `draft` (awaiting confirmation) → `confirmed` (user approved) → `in-progress` (`/tdd` started). The `completed` transition is owned by `/sprint-update`, which deletes the file.
+
+**To resume after a lost terminal:** `cat .claude/plans/<id>.md` and continue the pipeline from the recorded status.
+
+---
+
 ## Important Notes
 
 **CRITICAL**: The planner agent will **NOT** write any code until you explicitly confirm the plan with "yes" or "proceed" or similar affirmative response.
@@ -108,8 +153,8 @@ If you want changes, respond with:
 
 After planning:
 - Use `/tdd` to implement with test-driven development
-- Use `/build-fix` if build errors occur
-- Use `/code-review` to review completed implementation
+- Use `/code-review` to review the diff after `just ci` passes
+- Use `/pr-review` when raising the PR
 
 > **Need deeper planning?** Use `/capability` to decompose a phase or feature
 > into a capability plan before implementation planning. Use `/sprint-plan` to
@@ -121,4 +166,3 @@ After planning:
 - `/capability` — Capability planning (constraints, interfaces, open questions)
 - `/sprint-plan` — Sprint decomposition (features, acceptance criteria, definition of done)
 - `/tdd` — Test-driven development after planning
-- `/verify` — Build/test/lint verification loop

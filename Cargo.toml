@@ -1,0 +1,35 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.93.0"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+ulid         = { version = "1", features = ["serde"] }
+smol_str     = { version = "0.3", features = ["serde"] }
+thiserror    = "2"
+serde        = { version = "1", features = ["derive"] }
+camino       = { version = "1", features = ["serde1"] }
+proptest     = "1"
+serde_json   = "1"
+tokio        = { version = "1", features = ["sync"] }
+tokio-util   = "0.7"
+tokio-stream = "0.1"
+async-trait  = "0.1"
+futures      = { version = "0.3", default-features = false, features = ["std"] }
+bytes        = "1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+must_use_candidate = "warn"

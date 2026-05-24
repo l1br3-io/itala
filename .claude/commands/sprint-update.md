@@ -25,8 +25,9 @@ Persist a feature status change into the sprint plan memory. This is the "close-
    - `in-progress` → `In progress` (append `— <note>` when a note is provided).
    - `blocked` → `Blocked — <note>` (note is **required** for blocked).
    - `not-started` → `Not started` (resets prior status).
-4. If the flip completes every feature inside a sprint (Sprint 1, 2, or 3), **ask** the user whether to bump the relevant phase completion % in the top "Status Summary" table. Do not edit the table silently.
-5. Write the file back and echo a concise before/after delta (old status line → new status line) so the user can confirm.
+4. If status is `completed`: delete `.claude/plans/<feature-id>_*.md` (e.g. `F3_*.md`) if it exists. Silent no-op if absent.
+5. If the flip completes every feature inside a sprint (Sprint 1, 2, or 3), **ask** the user whether to bump the relevant phase completion % in the top "Status Summary" table. Do not edit the table silently.
+6. Write the file back and echo a concise before/after delta (old status line → new status line) so the user can confirm.
 
 ## Pre-flight Checks
 
@@ -36,7 +37,7 @@ Persist a feature status change into the sprint plan memory. This is the "close-
 
 ## When to Use
 
-- **After `/verify` passes** on a sprint feature's acceptance criteria → flip to `completed`.
+- **After `just ci` passes** on a sprint feature's acceptance criteria → flip to `completed`.
 - When starting work on a feature → flip to `in-progress` (so `/sprint-status` shows accurate "next up").
 - When a dependency or external decision halts progress → flip to `blocked` with a reason.
 - When walking back a premature completion → flip back to `in-progress` or `not-started`.
@@ -46,7 +47,7 @@ Do **not** mark `completed` just because tests pass — confirm the feature's ac
 ## Flow
 
 ```
-/tdd  →  /verify  →  /sprint-update <F#> completed  →  /sprint-status
+/tdd  →  just ci  →  /sprint-update <F#> completed  →  /sprint-status
 ```
 
 ## Examples
@@ -61,4 +62,3 @@ Do **not** mark `completed` just because tests pass — confirm the feature's ac
 
 - `/sprint-status` — Read the current sprint plan (no writes)
 - `/sprint-plan` — Create or re-decompose a phase into sprints
-- `/verify` — Verification loop that should precede `completed`

@@ -1,0 +1,5 @@
+# Build artifacts
+/target/
+
+# Active plan files — working documents only, not for version control
+.claude/plans/

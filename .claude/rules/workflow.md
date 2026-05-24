@@ -3,7 +3,7 @@
 ## Pipeline
 
 ```
-/sprint-plan  →  /capability  →  /plan  →  /tdd  →  /verify  →  /sprint-update
+/sprint-plan  →  /capability  →  /plan  →  /tdd  →  just ci  →  /sprint-update
   (phases)       (features)     (steps)    (code)   (quality)    (persist status)
 ```
 
@@ -12,6 +12,7 @@
 - The sprint plan is authoritative; check it before starting any work (`/sprint-status`)
 - `/sprint-update` is the ONLY sanctioned way to mutate feature statuses
 - Do not hand-edit `sprint_plan_current.md` for status changes
+- Every `/plan` output is saved to `.claude/plans/<id>.md` before confirmation — check there to resume after a lost terminal; deleted automatically when the feature is marked `completed`
 
 ## Status Rules
 
@@ -22,15 +23,31 @@
 
 ## Gated Process
 
+> The two hard gates (Gate 1: no code before `/tdd`; Gate 2: no `completed` before `just ci`) are stated as behavioral imperatives in `CLAUDE.md`, which is always loaded. This file provides the full pipeline detail.
+
 1. `/capability` — nail down constraints and interfaces before coding
-2. `/plan` — create implementation plan; WAIT for user confirmation before writing code
+2. `/plan` — create implementation plan; saved to `.claude/plans/<id>.md`; WAIT for user confirmation before writing code
 3. `/tdd` — RED-GREEN-REFACTOR cycle during implementation
-4. `/verify` — build + test + lint + typecheck must all pass
-5. `/sprint-update` — persist status after verify passes AND acceptance criteria are met
+4. `just ci` — build + test + lint + typecheck must all pass
+5. `/sprint-update` — persist status after `just ci` passes AND acceptance criteria are met
+
+Each gate is **mandatory and ordered**. A gate may not be skipped even if prior work seems complete.
+
+## Hard Gates — Never Cross Without Running the Gate
+
+| Gate | Blocks | Rule |
+|---|---|---|
+| User confirms `/plan` | Writing any implementation code | Invoke `/tdd` first. No inline coding. |
+| `/tdd` session complete | Running the full quality check | Run `just ci` first. |
+| `just ci` passes | Marking a feature done | Invoke `/sprint-update <F#> completed` — no other path. |
+
+If you find yourself writing implementation code without having invoked `/tdd`, stop immediately and invoke it.
+If you find yourself about to call `/sprint-update completed` without a passing `just ci`, stop and run it first.
 
 ## Anti-Patterns
 
-- Never code without a confirmed plan
+- **Never write implementation code after a confirmed `/plan` without first invoking `/tdd`** — this is the most common bypass and it happened on F2
 - Never mark complete on green tests alone — verify acceptance criteria
-- Never skip `/verify` before marking complete
+- **Never call `/sprint-update <F#> completed` without a prior passing `just ci`** — tests passing locally is not the same as the full CI gate
+- Never code without a confirmed plan
 - Never edit sprint plan statuses outside of `/sprint-update`

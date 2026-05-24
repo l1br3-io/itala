@@ -18,6 +18,19 @@ When working on a task, load the docs that match the decision you're making. Eac
 - **Personas and user stories** → [docs/PRODUCT.md](docs/PRODUCT.md)
 - **MVP scope and phased delivery** → [docs/ROADMAP.md](docs/ROADMAP.md)
 - **Kernel, plugin system, data model, security, accessibility** → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- **Sprint planning, feature workflow, process gates** → [.claude/rules/workflow.md](.claude/rules/workflow.md)
+
+## Workflow gates
+
+These two gates are **non-negotiable** for every sprint feature, without exception:
+
+**Gate 1 — After a confirmed `/plan`: invoke `/tdd` before writing any code.**
+Do not write implementation code inline. The `/tdd` skill drives all coding. If you find yourself writing code without having invoked `/tdd`, stop immediately and invoke it.
+
+**Gate 2 — Before `/sprint-update <F#> completed`: run `just ci` first.**
+Local test output is not a substitute for the full CI gate (`fmt` → `clippy` → `nextest` → `deny` → `doc`). If you find yourself about to mark a feature complete without a passing `just ci`, stop and run it.
+
+Full pipeline: `/sprint-plan` → `/capability` → `/plan` → `/tdd` → `just ci` → `/sprint-update`
 
 ## Rust quick map
 

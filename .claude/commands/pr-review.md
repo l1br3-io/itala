@@ -5,285 +5,144 @@ argument-hint: [pr-number | pr-url | blank for local review]
 
 # Code Review
 
-> PR review mode adapted from PRPs-agentic-eng by Wirasm. Part of the PRP workflow series.
+Orchestrates a code review and, in PR mode, publishes it to GitHub. The actual analysis is delegated to the [`code-reviewer`](../agents/code-reviewer.yaml) agent, which is Itala-stack-aware (Rust / TypeScript / WIT / docs+config buckets, with the matching `rules/*` loaded per bucket).
 
-**Input**: $ARGUMENTS
+**Input:** `$ARGUMENTS`
 
----
+## Mode selection
 
-## Mode Selection
-
-If `$ARGUMENTS` contains a PR number, PR URL, or `--pr`:
-→ Jump to **PR Review Mode** below.
-
-Otherwise:
-→ Use **Local Review Mode**.
+If `$ARGUMENTS` is a PR number, a PR URL, or starts with `--pr` → **PR Review Mode**.
+Otherwise → **Local Review Mode**.
 
 ---
 
 ## Local Review Mode
 
-Comprehensive security and quality review of uncommitted changes.
+Review uncommitted changes before they leave the working tree.
 
-### Phase 1 — GATHER
+1. **Gather** the diff:
+   ```bash
+   git diff --staged
+   git diff
+   ```
+   If both are empty, stop: `Nothing to review.`
 
-```bash
-git diff --name-only HEAD
-```
+2. **Delegate** to the `code-reviewer` agent. Pass it the diff. It will classify files by bucket, load the matching `.claude/rules/*` and `rules/rust/*`, and produce a severity-ordered report per its own output format.
 
-If no changed files, stop: "Nothing to review."
+3. **Run** local validation if the repo has a `Cargo.toml`:
+   ```bash
+   just ci
+   ```
+   If pre-runtime (no `Cargo.toml` yet), skip and note it.
 
-### Phase 2 — REVIEW
-
-Read each changed file in full. Check for:
-
-**Security Issues (CRITICAL):**
-- Hardcoded credentials, API keys, tokens
-- SQL injection vulnerabilities
-- XSS vulnerabilities
-- Missing input validation
-- Insecure dependencies
-- Path traversal risks
-
-**Code Quality (HIGH):**
-- Functions > 50 lines
-- Files > 800 lines
-- Nesting depth > 4 levels
-- Missing error handling
-- console.log statements
-- TODO/FIXME comments
-- Missing JSDoc for public APIs
-
-**Best Practices (MEDIUM):**
-- Mutation patterns (use immutable instead)
-- Emoji usage in code/comments
-- Missing tests for new code
-- Accessibility issues (a11y)
-
-### Phase 3 — REPORT
-
-Generate report with:
-- Severity: CRITICAL, HIGH, MEDIUM, LOW
-- File location and line numbers
-- Issue description
-- Suggested fix
-
-Block commit if CRITICAL or HIGH issues found.
-Never approve code with security vulnerabilities.
+4. **Report** the agent's findings to the user. Block on any CRITICAL.
 
 ---
 
 ## PR Review Mode
 
-Comprehensive GitHub PR review — fetches diff, reads full files, runs validation, posts review.
+### Phase 1 — Fetch
 
-### Phase 1 — FETCH
-
-Parse input to determine PR:
+Resolve `$ARGUMENTS` to a PR number:
 
 | Input | Action |
 |---|---|
-| Number (e.g. `42`) | Use as PR number |
-| URL (`github.com/.../pull/42`) | Extract PR number |
-| Branch name | Find PR via `gh pr list --head <branch>` |
+| Number (`42`) | use as PR number |
+| URL (`github.com/.../pull/42`) | extract the number |
+| Branch name | `gh pr list --head <branch>` |
 
 ```bash
-gh pr view <NUMBER> --json number,title,body,author,baseRefName,headRefName,changedFiles,additions,deletions
-gh pr diff <NUMBER>
+gh pr view <N> --json number,title,body,author,baseRefName,headRefName,changedFiles,additions,deletions
+gh pr diff <N>
 ```
 
-If PR not found, stop with error. Store PR metadata for later phases.
+If the PR doesn't exist, stop with the gh error.
 
-### Phase 2 — CONTEXT
+### Phase 2 — Context
 
-Build review context:
+Build the review context:
 
-1. **Project rules** — Read `CLAUDE.md`, `.claude/docs/`, and any contributing guidelines
-2. **PRP artifacts** — Check `.claude/PRPs/reports/` and `.claude/PRPs/plans/` for implementation context related to this PR
-3. **PR intent** — Parse PR description for goals, linked issues, test plans
-4. **Changed files** — List all modified files and categorize by type (source, test, config, docs)
+1. Load `CLAUDE.md` and the relevant `.claude/rules/*` (the `code-reviewer` agent does this per bucket — don't pre-load globally).
+2. Check `.claude/plans/<id>.md` for any plan whose `id` matches the PR's linked feature; if present, the plan's success criteria become part of the review.
+3. Parse the PR description for goals, linked issues, and the PR author's test plan.
 
-### Phase 3 — REVIEW
+### Phase 3 — Review
 
-Read each changed file **in full** (not just the diff hunks — you need surrounding context).
+Delegate to the `code-reviewer` agent against the PR diff. The agent will:
+- Classify changed files into buckets (Rust / TypeScript / WIT / docs+config).
+- Load only the rule files that govern those buckets.
+- Apply Itala-specific checklists per `rules/rust/*` and `rules/typescript/*`.
+- Return a severity-ordered report with the agent's own output format.
 
-For PR reviews, fetch the full file contents at the PR head revision:
+### Phase 4 — Validate
+
+Run the gates that apply at the PR head revision:
+
 ```bash
-gh pr diff <NUMBER> --name-only | while IFS= read -r file; do
-  gh api "repos/{owner}/{repo}/contents/$file?ref=<head-branch>" --jq '.content' | base64 -d
-done
+just ci    # fmt → clippy → nextest → deny → doc
 ```
 
-Apply the review checklist across 7 categories:
+If the diff is docs/config only (no Rust or TS changed), skip and note it. Record pass/fail of each step.
 
-| Category | What to Check |
-|---|---|
-| **Correctness** | Logic errors, off-by-ones, null handling, edge cases, race conditions |
-| **Type Safety** | Type mismatches, unsafe casts, `any` usage, missing generics |
-| **Pattern Compliance** | Matches project conventions (naming, file structure, error handling, imports) |
-| **Security** | Injection, auth gaps, secret exposure, SSRF, path traversal, XSS |
-| **Performance** | N+1 queries, missing indexes, unbounded loops, memory leaks, large payloads |
-| **Completeness** | Missing tests, missing error handling, incomplete migrations, missing docs |
-| **Maintainability** | Dead code, magic numbers, deep nesting, unclear naming, missing types |
-
-Assign severity to each finding:
-
-| Severity | Meaning | Action |
-|---|---|---|
-| **CRITICAL** | Security vulnerability or data loss risk | Must fix before merge |
-| **HIGH** | Bug or logic error likely to cause issues | Should fix before merge |
-| **MEDIUM** | Code quality issue or missing best practice | Fix recommended |
-| **LOW** | Style nit or minor suggestion | Optional |
-
-### Phase 4 — VALIDATE
-
-Run available validation commands:
-
-Detect the project type from config files (`package.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, etc.), then run the appropriate commands:
-
-**Node.js / TypeScript** (has `package.json`):
-```bash
-npm run typecheck 2>/dev/null || npx tsc --noEmit 2>/dev/null  # Type check
-npm run lint                                                    # Lint
-npm test                                                        # Tests
-npm run build                                                   # Build
-```
-
-**Rust** (has `Cargo.toml`):
-```bash
-cargo clippy -- -D warnings  # Lint
-cargo test                   # Tests
-cargo build                  # Build
-```
-
-**Go** (has `go.mod`):
-```bash
-go vet ./...    # Lint
-go test ./...   # Tests
-go build ./...  # Build
-```
-
-**Python** (has `pyproject.toml` / `setup.py`):
-```bash
-pytest  # Tests
-```
-
-Run only the commands that apply to the detected project type. Record pass/fail for each.
-
-### Phase 5 — DECIDE
-
-Form recommendation based on findings:
+### Phase 5 — Decide
 
 | Condition | Decision |
 |---|---|
-| Zero CRITICAL/HIGH issues, validation passes | **APPROVE** |
-| Only MEDIUM/LOW issues, validation passes | **APPROVE** with comments |
-| Any HIGH issues or validation failures | **REQUEST CHANGES** |
-| Any CRITICAL issues | **BLOCK** — must fix before merge |
+| Zero CRITICAL/HIGH, `just ci` green | **APPROVE** |
+| Only MEDIUM/LOW, `just ci` green | **APPROVE** with comments |
+| Any HIGH or `just ci` failure | **REQUEST CHANGES** |
+| Any CRITICAL | **BLOCK** |
+| Draft PR | **COMMENT** only (regardless of severity) |
 
-Special cases:
-- Draft PR → Always use **COMMENT** (not approve/block)
-- Only docs/config changes → Lighter review, focus on correctness
-- Explicit `--approve` or `--request-changes` flag → Override decision (but still report all findings)
+If the `code-reviewer` agent flagged a security escalation, append: *"Recommend invoking `security-reviewer` for deeper analysis."*
 
-### Phase 6 — REPORT
+### Phase 6 — Publish
 
-Create review artifact at `.claude/PRPs/reviews/pr-<NUMBER>-review.md`:
-
-```markdown
-# PR Review: #<NUMBER> — <TITLE>
-
-**Reviewed**: <date>
-**Author**: <author>
-**Branch**: <head> → <base>
-**Decision**: APPROVE | REQUEST CHANGES | BLOCK
-
-## Summary
-<1-2 sentence overall assessment>
-
-## Findings
-
-### CRITICAL
-<findings or "None">
-
-### HIGH
-<findings or "None">
-
-### MEDIUM
-<findings or "None">
-
-### LOW
-<findings or "None">
-
-## Validation Results
-
-| Check | Result |
-|---|---|
-| Type check | Pass / Fail / Skipped |
-| Lint | Pass / Fail / Skipped |
-| Tests | Pass / Fail / Skipped |
-| Build | Pass / Fail / Skipped |
-
-## Files Reviewed
-<list of files with change type: Added/Modified/Deleted>
-```
-
-### Phase 7 — PUBLISH
-
-Post the review to GitHub:
+Post to GitHub:
 
 ```bash
-# If APPROVE
-gh pr review <NUMBER> --approve --body "<summary of review>"
+# APPROVE
+gh pr review <N> --approve --body "<summary>"
 
-# If REQUEST CHANGES
-gh pr review <NUMBER> --request-changes --body "<summary with required fixes>"
+# REQUEST CHANGES
+gh pr review <N> --request-changes --body "<summary with required fixes>"
 
-# If COMMENT only (draft PR or informational)
-gh pr review <NUMBER> --comment --body "<summary>"
+# COMMENT (draft PRs, informational)
+gh pr review <N> --comment --body "<summary>"
 ```
 
-For inline comments on specific lines, use the GitHub review comments API:
-```bash
-gh api "repos/{owner}/{repo}/pulls/<NUMBER>/comments" \
-  -f body="<comment>" \
-  -f path="<file>" \
-  -F line=<line-number> \
-  -f side="RIGHT" \
-  -f commit_id="$(gh pr view <NUMBER> --json headRefOid --jq .headRefOid)"
-```
+For inline comments at specific lines, batch via the reviews API:
 
-Alternatively, post a single review with multiple inline comments at once:
 ```bash
-gh api "repos/{owner}/{repo}/pulls/<NUMBER>/reviews" \
+gh api "repos/{owner}/{repo}/pulls/<N>/reviews" \
   -f event="COMMENT" \
   -f body="<overall summary>" \
-  --input comments.json  # [{"path": "file", "line": N, "body": "comment"}, ...]
+  --input comments.json   # [{"path": "...", "line": N, "body": "..."}, ...]
 ```
 
-### Phase 8 — OUTPUT
+### Phase 7 — Output
 
-Report to user:
+Report to the user:
 
 ```
-PR #<NUMBER>: <TITLE>
-Decision: <APPROVE|REQUEST_CHANGES|BLOCK>
-
-Issues: <critical_count> critical, <high_count> high, <medium_count> medium, <low_count> low
-Validation: <pass_count>/<total_count> checks passed
-
-Artifacts:
-  Review: .claude/PRPs/reviews/pr-<NUMBER>-review.md
-  GitHub: <PR URL>
-
-Next steps:
-  - <contextual suggestions based on decision>
+PR #<N>: <title>
+Decision: <APPROVE | REQUEST_CHANGES | BLOCK | COMMENT>
+Findings: <C> CRITICAL, <H> HIGH, <M> MEDIUM, <L> LOW
+Validation: just ci <pass|fail|skipped>
+GitHub: <PR URL>
 ```
 
 ---
 
-## Edge Cases
+## Edge cases
 
-- **No `gh` CLI**: Fall back to local-only review (read the diff, skip GitHub publish). Warn user.
-- **Diverged branches**: Suggest `git fetch origin && git rebase origin/<base>` before review.
-- **Large PRs (>50 files)**: Warn about review scope. Focus on source changes first, then tests, then config/docs.
+- **No `gh` CLI** — fall back to local-only review and warn.
+- **Diverged branches** — suggest `git fetch origin && git rebase origin/<base>` before reviewing.
+- **Pre-runtime repo state** — if `crates/` doesn't exist yet, the diff is expected to be docs/config only. Don't fabricate Rust findings; the `code-reviewer` agent's pre-runtime note governs.
+- **Large PRs (>50 files)** — warn about scope. Have the agent prioritize source changes, then tests, then config/docs.
+
+## Related
+
+- [`code-reviewer` agent](../agents/code-reviewer.yaml) — the stack-aware reviewer that does the analysis.
+- [`security-reviewer` agent](../agents/security-reviewer.yaml) — escalate when the diff touches `unsafe`, FFI, crypto, IPC, plugin host, or signature verification.
+- [`/workflow`](workflow.md) — full pipeline context.
