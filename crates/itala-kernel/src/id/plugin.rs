@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::error::Error;
-use crate::id::validate;
 
 /// Unique identifier for a plugin, using reverse-domain-name notation.
 ///
@@ -32,7 +31,7 @@ impl PluginId {
     /// 128 characters.
     pub fn new(s: impl Into<SmolStr>) -> Result<Self, Error> {
         let s: SmolStr = s.into();
-        validate::plugin_id(s.as_str())?;
+        validate(s.as_str())?;
         Ok(Self(s))
     }
 
@@ -63,6 +62,42 @@ impl crate::id::Identity for PluginId {
     const KIND: crate::id::IdKind = crate::id::IdKind::Plugin;
 }
 
+fn validate(s: &str) -> Result<(), Error> {
+    if s.is_empty() || s.len() > 128 {
+        return Err(Error::InvalidId {
+            kind: crate::id::IdKind::Plugin,
+            raw: s.to_owned(),
+        });
+    }
+    // RDN: at least two dot-separated segments of [a-z][a-z0-9-]*
+    let mut dot_count = 0usize;
+    for segment in s.split('.') {
+        if !is_valid_kebab_segment(segment) {
+            return Err(Error::InvalidId {
+                kind: crate::id::IdKind::Plugin,
+                raw: s.to_owned(),
+            });
+        }
+        dot_count += 1;
+    }
+    if dot_count < 2 {
+        return Err(Error::InvalidId {
+            kind: crate::id::IdKind::Plugin,
+            raw: s.to_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn is_valid_kebab_segment(s: &str) -> bool {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_lowercase() => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,9 +123,12 @@ mod tests {
     fn invalid_samples() {
         assert!(PluginId::new("").is_err());
         assert!(PluginId::new("foo").is_err());
+        assert!(PluginId::new("foo.").is_err()); // trailing dot → empty segment
+        assert!(PluginId::new(".foo.bar").is_err()); // leading dot → empty segment
         assert!(PluginId::new("Foo.bar").is_err());
         assert!(PluginId::new("1foo.bar").is_err());
         assert!(PluginId::new("foo.bar baz").is_err());
+        assert!(PluginId::new("a.b".repeat(100)).is_err()); // > 128
     }
 
     #[test]

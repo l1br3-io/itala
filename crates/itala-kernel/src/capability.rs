@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::error::{Error, Result};
-use crate::id::validate;
 
 mod sealed {
     /// Zero-sized private type used to seal [`super::CapabilityGranter`].
@@ -61,7 +60,7 @@ impl CapabilityName {
     /// required format or exceeds 256 characters.
     pub fn new(s: impl Into<SmolStr>) -> Result<Self> {
         let s: SmolStr = s.into();
-        validate::capability_name(s.as_str())?;
+        validate(s.as_str())?;
         Ok(Self(s))
     }
 
@@ -136,6 +135,33 @@ pub trait CapabilityGranter: sealed::Sealed {
     }
 }
 
+fn validate(s: &str) -> Result<()> {
+    // At least two dot-separated segments of [a-z][a-z0-9-]*
+    if s.is_empty() || s.len() > 256 {
+        return Err(Error::InvalidCapabilityName { raw: s.to_owned() });
+    }
+    let mut dot_count = 0usize;
+    for segment in s.split('.') {
+        if !is_valid_kebab_segment(segment) {
+            return Err(Error::InvalidCapabilityName { raw: s.to_owned() });
+        }
+        dot_count += 1;
+    }
+    if dot_count < 2 {
+        return Err(Error::InvalidCapabilityName { raw: s.to_owned() });
+    }
+    Ok(())
+}
+
+fn is_valid_kebab_segment(s: &str) -> bool {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_lowercase() => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,5 +202,13 @@ mod tests {
         let cap = granter.mint(name);
         let cap2 = cap.clone();
         assert_eq!(cap, cap2);
+    }
+
+    #[test]
+    fn capability_name_invalid() {
+        assert!(CapabilityName::new("").is_err());
+        assert!(CapabilityName::new("host").is_err()); // single segment
+        assert!(CapabilityName::new("Host.vfs").is_err()); // uppercase
+        assert!(CapabilityName::new("host.").is_err()); // trailing dot → empty segment
     }
 }

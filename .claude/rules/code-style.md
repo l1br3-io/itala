@@ -11,6 +11,16 @@ Style conventions across Itala. Language-specific rules live in subfolders; this
 5. **DRY where it counts** — duplicate three lines before extracting a helper for two.
 6. **No comments restating the code** — only explain *why* when the why isn't obvious.
 
+## Cohesion
+
+Helpers — validation, formatting, conversion, parsing — belong in the same file as the type they primarily serve. Don't extract a shared `utils` module just because two callers share similar-looking logic.
+
+**The tell:** a public module whose only outside consumer is one caller in another bounded context. When a module is public solely to serve one outside caller, that caller should own the code instead.
+
+**Duplication is intentional** (principle #5 above). A small helper copied into two files lets each caller's invariant diverge independently without hidden coupling.
+
+**When a file grows too large, the fix is a directory** — not a shared utility module. Split by bounded context; each concern owns its helpers. Language-specific rules elaborate on the file/module idioms (`rules/rust/api-design.md`, `rules/typescript/coding-style.md`).
+
 ## Language-specific rules
 
 - **Rust** (kernel, contexts, plugin host, CLI, all libraries): see `rules/rust/` (11 files — workspace, api-design, error-handling, async, ownership-and-lifetimes, traits-and-dispatch, unsafe-and-ffi, security, testing, tooling, wasm-plugins).

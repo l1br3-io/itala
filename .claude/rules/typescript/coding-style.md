@@ -9,6 +9,10 @@ paths:
 
 > Applies to the thin webview shell inside Tauri (`apps/*/ui/`). The webview hosts CodeMirror 6, the command palette, settings, and theme. Heavy logic lives in Rust.
 
+## Cohesion
+
+Helpers belong with the component or store they serve. A `utils.ts` imported by two unrelated components is the same coupling smell as a shared Rust util module — see `rules/code-style.md` § Cohesion. When a component or store grows too large, split it into a directory (`components/Editor/`, `stores/editor/`) rather than extracting cross-cutting helpers.
+
 ## Strictness
 
 `tsconfig.json` enables every strictness flag:

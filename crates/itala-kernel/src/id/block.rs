@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use crate::error::Error;
-use crate::id::validate;
 
 /// Identifier for a specific block within a note, used in `[[Note#^block-id]]` references.
 ///
@@ -31,7 +30,7 @@ impl BlockId {
     /// or contains characters outside `[A-Za-z0-9_-]`.
     pub fn new(s: impl Into<SmolStr>) -> Result<Self, Error> {
         let s: SmolStr = s.into();
-        validate::block_id(s.as_str())?;
+        validate(s.as_str())?;
         Ok(Self(s))
     }
 
@@ -60,6 +59,25 @@ impl crate::id::sealed::Sealed for BlockId {}
 
 impl crate::id::Identity for BlockId {
     const KIND: crate::id::IdKind = crate::id::IdKind::Block;
+}
+
+fn validate(s: &str) -> Result<(), Error> {
+    if s.is_empty() || s.len() > 64 {
+        return Err(Error::InvalidId {
+            kind: crate::id::IdKind::Block,
+            raw: s.to_owned(),
+        });
+    }
+    if !s
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    {
+        return Err(Error::InvalidId {
+            kind: crate::id::IdKind::Block,
+            raw: s.to_owned(),
+        });
+    }
+    Ok(())
 }
 
 #[cfg(test)]

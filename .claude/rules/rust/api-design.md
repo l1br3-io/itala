@@ -2,6 +2,31 @@
 
 > Extends `rules/api-design.md` (generic) with Rust-specific guidance.
 
+## Cohesion: helpers live with the code they serve
+
+> The general principle lives in `rules/code-style.md`. This section adds the Rust-specific tells and the 2018+ module idiom.
+
+**The Rust tell:** a `pub mod` whose only external consumer is a type that could own the logic itself. A `validate.rs` imported across a sibling-module boundary (e.g. `capability.rs` reaching into `id::validate`) is the canonical shape — `pub` exists solely to serve one outside caller, so the caller should hold the code instead.
+
+**Duplication is intentional.** A small shared helper (e.g. `is_valid_kebab_segment`) copied into two files lets each type diverge independently without hidden coupling.
+
+**When a file grows too large**, the fix is a directory — not a shared utility module:
+
+```
+// WRONG: shared util that two sibling modules import
+payment/
+    mod.rs
+    utils.rs        ← helpers for both providers and fx — coupling leak
+
+// RIGHT: each concern owns its helpers; split by bounded context
+payment/
+    providers.rs    ← provider helpers live here
+    fx.rs           ← fx helpers live here
+    limits.rs       ← limit helpers live here
+```
+
+Use the 2018+ module idiom (`payment.rs` + `payment/` siblings) per `rules/rust/workspace.md`. A directory is the right response to size; a shared-util module is almost never the right response to similarity.
+
 ## Newtype IDs
 
 Never pass raw strings or integers as identity. Wrap them.

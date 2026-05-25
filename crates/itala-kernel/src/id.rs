@@ -1,7 +1,5 @@
 //! Identity types for all Itala domain entities.
 
-pub mod validate;
-
 mod block;
 mod link;
 mod macros;
