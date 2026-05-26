@@ -30,6 +30,28 @@ pub fn make_box(v: impl DynVfs + 'static) -> Arc<dyn DynVfs> { Arc::new(v) }
 
 Default to native async-fn-in-trait. Reach for `async-trait` only when boxing is required.
 
+### The `Send` leak on RPITIT
+
+Native `async fn` in trait desugars to a return-position-impl-Trait (RPITIT). The returned future is **not automatically `Send`** — auto-traits are inferred from each impl's body, and a single non-`Send` local will silently drop the bound. Callers using `tokio::spawn` will then get cryptic "future is not `Send`" errors at the call site, not the trait.
+
+Two workarounds:
+
+```rust
+// (1) Manual return-type with the bound — explicit, no extra dep.
+pub trait Vfs: Send + Sync {
+    fn read(&self, path: &Utf8Path) -> impl Future<Output = Result<Bytes>> + Send;
+}
+
+// (2) `trait-variant` — generates a `Send`-bounded sibling trait.
+#[trait_variant::make(SendVfs: Send)]
+pub trait Vfs: Send + Sync {
+    async fn read(&self, path: &Utf8Path) -> Result<Bytes>;
+}
+// Callers that need `Send` futures impl/use `SendVfs`; others use `Vfs`.
+```
+
+Itala rule: any async trait whose impls will be `spawn`-ed (storage, sync transport, AI provider) declares the `Send` bound explicitly via one of these two patterns. Don't rely on inference.
+
 ## Send + Sync
 
 - All public types are `Send + Sync` unless explicitly documented otherwise — make impossibility a comment.
@@ -81,6 +103,22 @@ pub async fn run(token: CancellationToken) -> Result<()> {
 ```
 
 Drop-on-cancel is fine for leaf tasks; long-running services accept a token explicitly.
+
+### `select!` cancel-safety
+
+`tokio::select!` polls every branch, then drops the futures of branches that didn't complete. A branch's future must be **cancel-safe**: dropping it mid-poll must not lose data or leave the underlying resource in an unusable state.
+
+Per the tokio `select!` rustdoc:
+
+| Cancel-safe (use freely in `select!`) | Not cancel-safe (loop outside `select!` or use `Box::pin` + manual poll) |
+|---|---|
+| `mpsc::Receiver::recv`, `UnboundedReceiver::recv` | `AsyncReadExt::read_exact` |
+| `oneshot::Receiver` (`.await`) | `AsyncReadExt::read_to_end`, `read_to_string` |
+| `broadcast::Receiver::recv` | `AsyncWriteExt::write_all` |
+| `AsyncReadExt::read` (returns however many bytes arrived) | `AsyncBufReadExt::read_line` (partial-line state is lost) |
+| `Stream::next` (on a `FusedStream`) | Anything with multi-step internal state machines you didn't write |
+
+When in doubt, check the rustdoc page of the specific method — tokio marks cancel-safety explicitly.
 
 ## Locks
 

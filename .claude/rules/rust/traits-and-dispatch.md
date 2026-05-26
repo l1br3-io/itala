@@ -1,6 +1,6 @@
 # Rust Traits & Dispatch
 
-> How Itala chooses between generics and trait objects, designs object-safe traits, and uses the type system to enforce protocol state. Read alongside `rules/rust/api-design.md` (general API discipline) and `rules/rust/wasm-plugins.md` (WIT-bound traits).
+> How Itala chooses between generics and trait objects, designs dyn-compatible traits, and uses the type system to enforce protocol state. Read alongside `rules/rust/api-design.md` (general API discipline) and `rules/rust/wasm-plugins.md` (WIT-bound traits).
 
 ## Static vs. dynamic dispatch — the Itala rule
 
@@ -13,16 +13,18 @@
 
 Reach for generics when the caller already knows the type. Reach for trait objects when the *system* selects the type at runtime (config, plugin manifest, user choice).
 
-## Object safety checklist
+## Dyn compatibility checklist
 
-A trait is object-safe (i.e. usable as `dyn Trait`) iff every method:
+> Formerly called "object safety." Rustc diagnostics and the Reference adopted "dyn compatibility" in late 2024 (lang-team RFC #286); the older term still appears in older docs and search results.
+
+A trait is **dyn-compatible** (i.e. usable as `dyn Trait`) iff every method:
 
 - Has a receiver (`&self`, `&mut self`, `self: Box<Self>`, etc.) — or is exempted by `where Self: Sized`.
 - Does **not** use generic type parameters.
 - Does **not** return `Self` by value (returning `Box<Self>` is fine).
 - Does **not** take `Self` by value (except via the receiver).
 
-If a method violates these, exempt it instead of dropping object safety:
+If a method violates these, exempt it instead of dropping dyn compatibility:
 
 ```rust
 pub trait Plugin: Send + Sync {

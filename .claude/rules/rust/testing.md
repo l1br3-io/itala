@@ -45,6 +45,24 @@ fail-fast = false
 
 Use `cargo test --doc` separately for doctests — nextest does not run them.
 
+## Parameterized tests: `rstest`
+
+Use `rstest` for table-driven tests and fixture-based setup. It is the de facto standard for parameterized Rust tests (the language has no built-in equivalent).
+
+```rust
+use rstest::rstest;
+
+#[rstest]
+#[case::ascii("hello",        "hello")]
+#[case::unicode("café",       "café")]
+#[case::trim("  hello  ",     "hello")]
+fn normalizes_title(#[case] input: &str, #[case] expected: &str) {
+    assert_eq!(normalize_title(input), expected);
+}
+```
+
+Use `rstest` for finite tabular cases; reach for `proptest` (below) when the input space is too large to enumerate.
+
 ## Property tests: `proptest`
 
 Anything with algebraic invariants gets property tests:

@@ -64,12 +64,28 @@ Nextest config in `.config/nextest.toml` per `rules/rust/testing.md`.
 ## Supply chain
 
 ```
-cargo deny check          # licenses + bans + advisories
-cargo audit               # RustSec advisory database
+cargo deny check          # licenses + bans + advisories (consumes RustSec DB)
 cargo machete             # unused deps
+cargo hack --feature-powerset check  # feature-combination build check
 ```
 
 `deny.toml` lives at the repo root.
+
+`cargo audit` is **not** run separately — `cargo-deny`'s `advisories` check consumes the same RustSec advisory database. Running both is redundant ([cargo-deny advisories docs](https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html)).
+
+`cargo-hack` catches feature-flag combinations that compile individually but break together. Run on every PR for any crate with optional features.
+
+## API stability
+
+`itala-plugin-api` is semver-frozen (see `rules/rust/workspace.md`). CI enforces this:
+
+```
+cargo semver-checks --package itala-plugin-api
+```
+
+`cargo-semver-checks` is the de facto standard for catching breaking changes in public APIs ([Rust Project Goal 2026](https://rust-lang.github.io/rust-project-goals/2026/cargo-semver-checks.html)). Failing this check blocks the merge.
+
+Other plugin-facing crates declare `rust-version = "..."` in their `Cargo.toml` so downstream plugin authors get a clear MSRV signal; the workspace toolchain pin alone is not visible to consumers.
 
 ## Documentation
 
@@ -103,7 +119,8 @@ test:
 
 deny:
     cargo deny check
-    cargo audit
+    cargo hack --feature-powerset check
+    cargo semver-checks --package itala-plugin-api
 
 doc:
     RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace --open
@@ -117,9 +134,11 @@ Every PR runs in this order:
 1. `cargo fmt --check`
 2. `cargo clippy -- -D warnings`
 3. `cargo nextest run`
-4. `cargo test --doc`
+4. `cargo test --doc` (nextest does not run doctests as of v0.9.x — keep this step separate)
 5. `cargo deny check`
-6. `cargo doc` (broken-link check)
+6. `cargo hack --feature-powerset check`
+7. `cargo semver-checks --package itala-plugin-api`
+8. `cargo doc` (broken-link check)
 
 Mutation testing (`cargo mutants`) runs on a nightly cron against `itala-kernel` and `itala-plugin-host`.
 
