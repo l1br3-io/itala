@@ -73,6 +73,6 @@ pub trait Identity:
     const KIND: IdKind;
 }
 
-pub mod sealed {
+mod sealed {
     pub trait Sealed {}
 }
