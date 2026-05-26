@@ -32,6 +32,7 @@ For each capability, enumerate:
 | **Data Ownership** | Which crate owns this data? Where is it persisted (vault Markdown, `.itala/index.redb`, opendal-backed transport)? |
 | **Lifecycle** | Created when? Updated how? Deleted/archived when? CRDT semantics? |
 | **Failure Modes** | What happens when the plugin host is unavailable? When the AI provider rate-limits? When sync transport is offline? When the search index is corrupted? |
+| **Growth Boundary** | At what scale or complexity does this design need revisiting? What future requirement would invalidate the core design choice? What are we explicitly not solving that a future capability might assume we solved? |
 | **Rollout** | Phase dependency? Feature flag? Migration required (data, plugin API, schema)? |
 
 ### 3. Define Implementation Contract
@@ -104,6 +105,11 @@ Decide the handoff:
 ## NON-GOALS
 - [What this capability explicitly does NOT cover]
 
+## DESIGN BOUNDARIES
+- [Scale limit: what breaks at 10x current load or complexity, and what specific condition triggers a revisit]
+- [Invalidating requirement: what single new need would make the core design choice wrong]
+- [Assumed non-goals: what this explicitly does not solve that a future capability might assume it does]
+
 ## OPEN QUESTIONS
 - [Blocker or product decision needed]
 
@@ -116,7 +122,7 @@ Decide the handoff:
 
 1. Do not invent product truth — mark unresolved questions explicitly
 2. Separate user-visible promises from implementation details
-3. Call out what is fixed (constraint) vs. preference (could change) vs. open (needs decision)
+3. Call out what is fixed (constraint) vs. preference (could change) vs. open (needs decision). For every significant design choice, explicitly state what future requirement would make it wrong.
 4. Always check both kernel and webview impact for user-facing features
 5. Reference the kernel's repository pattern (in `rules/api-design.md`) for collection contracts
 6. Respect the local-first principle — cloud features (sync, cloud AI) must degrade gracefully

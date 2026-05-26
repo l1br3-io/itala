@@ -14,7 +14,9 @@
 //!   [`CapabilityGranter`] trait for authorized minting.
 //! - **VFS** — [`Vfs`] (static dispatch) and [`DynVfs`] (object-safe) abstract
 //!   over storage backends; [`VfsEvent`] carries raw change notifications.
-//! - **Event bus** — [`EventBus`] broadcasts [`KernelEvent`]s to subscribers.
+//! - **Event bus** — [`EventBus`] is a generic broadcast primitive over any
+//!   `Clone + Send + 'static` payload. [`KernelEventBus`] aliases it for the
+//!   kernel's own [`KernelEvent`] enum.
 //! - **Cancellation** — [`CancellationToken`] re-exported for cooperative shutdown.
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -29,7 +31,7 @@ pub use tokio_util::sync::CancellationToken;
 
 pub use capability::{Capability, CapabilityGranter, CapabilityName};
 pub use error::{Error, Result};
-pub use events::{EventBus, KernelEvent};
+pub use events::{EventBus, KernelEvent, KernelEventBus};
 pub use id::{BlockId, IdKind, Identity, LinkId, NoteId, PluginId, VaultId};
 pub use vfs::{DynVfs, Vfs, VfsEvent};
 
@@ -77,6 +79,6 @@ mod assertions {
         // Events
         assert_send_sync::<KernelEvent>();
         assert_unpin::<KernelEvent>();
-        assert_send_sync::<EventBus>();
+        assert_send_sync::<KernelEventBus>();
     }
 }

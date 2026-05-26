@@ -10,10 +10,11 @@ or product discussion into a structured capability plan.
 ## What This Command Does
 
 1. **Restate the capability** — who benefits, what changes, what outcome
-2. **Resolve constraints** — business rules, scope, data ownership, lifecycle, failure modes
+2. **Resolve constraints** — business rules, scope, data ownership, lifecycle, failure modes, growth boundaries
 3. **Define implementation contract** — actors, surfaces, states, interfaces, data, security
-4. **Identify open questions** — blockers that need product decisions
-5. **Determine handoff** — ready for `/plan`, needs review, or needs clarification
+4. **State design boundaries** — scale limits, invalidating requirements, assumed non-goals
+5. **Identify open questions** — blockers that need product decisions
+6. **Determine handoff** — ready for `/plan`, needs review, or needs clarification
 
 ## When to Use
 

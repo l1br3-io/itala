@@ -1,17 +1,23 @@
 //! Kernel-level event bus.
 //!
-//! [`EventBus`] broadcasts typed [`KernelEvent`]s to any number of subscribers
-//! using a bounded [`tokio::sync::broadcast`] channel (capacity 1024). Publishing
-//! is fire-and-forget: if no subscribers are listening, the event is silently
+//! [`EventBus<E>`] is a generic broadcast primitive over any
+//! `Clone + Send + 'static` payload, backed by a bounded
+//! [`tokio::sync::broadcast`] channel (capacity 1024). Publishing is
+//! fire-and-forget: if no subscribers are listening, the event is silently
 //! dropped. Subscribers that fall too far behind receive
 //! [`tokio::sync::broadcast::error::RecvError::Lagged`].
+//!
+//! The kernel ships one concrete event type today, [`KernelEvent`], with a
+//! convenience alias [`KernelEventBus`]. Bounded-context crates introduced
+//! later (vault, note-editor, graph, …) will define their own event enums and
+//! parameterize [`EventBus`] over them.
 //!
 //! # Usage
 //!
 //! ```
 //! use itala_kernel::{EventBus, KernelEvent, NoteId, VaultId};
 //!
-//! let bus = EventBus::new();
+//! let bus: EventBus<KernelEvent> = EventBus::new();
 //! let mut rx = bus.subscribe();
 //!
 //! let vault_id = VaultId::new();
@@ -33,6 +39,11 @@ const BUS_CAPACITY: usize = 1024;
 ///
 /// The enum is `#[non_exhaustive]` — new variants may be added in minor
 /// releases without breaking existing match arms.
+//
+// TODO(F4): when `itala-vault` is created, this enum splits into
+// `vault::VaultEvent` (Opened/Closed/…) and `note::NoteEvent` (Saved/Deleted/…)
+// and moves out of the kernel. The [`KernelEventBus`] alias below is the only
+// kernel-side reference today; deleting both is the migration.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum KernelEvent {
@@ -62,29 +73,40 @@ pub enum KernelEvent {
     },
 }
 
-/// Broadcasts [`KernelEvent`]s to any number of concurrent subscribers.
+/// Broadcasts events of type `E` to any number of concurrent subscribers.
 ///
 /// Wraps [`tokio::sync::broadcast`] at a fixed capacity of 1024. Multiple
 /// independent parts of the system (vault, search, graph, UI) subscribe and
 /// react without coupling to one another.
 ///
+/// `E` is the payload type; it must be `Clone` (broadcast fans out by cloning)
+/// and `Send + 'static` (the channel is shared across tasks). Each bounded
+/// context crate parameterizes the bus over its own event enum.
+///
 /// # Cloning and sharing
 ///
-/// `EventBus` is cheap to clone — both the original and the clone share the
-/// same underlying channel. Use `Arc<EventBus>` when you need shared ownership
-/// across tasks.
+/// `EventBus<E>` is cheap to clone — both the original and the clone share the
+/// same underlying channel. Use `Arc<EventBus<E>>` when you need shared
+/// ownership across tasks.
 ///
 /// # Back-pressure
 ///
 /// This bus is fire-and-forget. If a slow subscriber's receive buffer overflows,
 /// it receives [`tokio::sync::broadcast::error::RecvError::Lagged`] on the next
 /// call. Design consumers so they can tolerate missed events or drain promptly.
-#[derive(Clone)]
-pub struct EventBus {
-    sender: broadcast::Sender<KernelEvent>,
+pub struct EventBus<E: Clone + Send + 'static> {
+    sender: broadcast::Sender<E>,
 }
 
-impl EventBus {
+impl<E: Clone + Send + 'static> Clone for EventBus<E> {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+        }
+    }
+}
+
+impl<E: Clone + Send + 'static> EventBus<E> {
     /// Create a new bus with the default ring-buffer capacity (1024).
     #[must_use]
     pub fn new() -> Self {
@@ -97,7 +119,7 @@ impl EventBus {
     /// The returned receiver will see all events published *after* this call.
     /// Events published before [`EventBus::subscribe`] is called are not delivered.
     #[must_use]
-    pub fn subscribe(&self) -> broadcast::Receiver<KernelEvent> {
+    pub fn subscribe(&self) -> broadcast::Receiver<E> {
         self.sender.subscribe()
     }
 
@@ -107,7 +129,7 @@ impl EventBus {
     /// zero-subscriber send is not an error. If the ring buffer is full,
     /// the oldest event is overwritten (subscribers may see
     /// [`tokio::sync::broadcast::error::RecvError::Lagged`]).
-    pub fn publish(&self, event: KernelEvent) {
+    pub fn publish(&self, event: E) {
         // Ignore SendError — zero subscribers is normal at startup.
         let _ = self.sender.send(event);
     }
@@ -119,11 +141,18 @@ impl EventBus {
     }
 }
 
-impl Default for EventBus {
+impl<E: Clone + Send + 'static> Default for EventBus<E> {
     fn default() -> Self {
         Self::new()
     }
 }
+
+/// Convenience alias for the kernel-internal event stream.
+///
+/// TODO(F4): `KernelEvent` migrates to `itala-vault` (becoming `VaultEvent` +
+/// `NoteEvent`); this alias is then deleted, and the kernel exposes only the
+/// generic [`EventBus<E>`] primitive.
+pub type KernelEventBus = EventBus<KernelEvent>;
 
 #[cfg(test)]
 mod tests {
@@ -153,7 +182,8 @@ mod tests {
 
     #[test]
     fn event_bus_is_send_sync() {
-        assert_send_sync::<EventBus>();
+        assert_send_sync::<EventBus<KernelEvent>>();
+        assert_send_sync::<KernelEventBus>();
     }
 
     // -------------------------------------------------------------------------
@@ -162,7 +192,7 @@ mod tests {
 
     #[test]
     fn publish_with_no_subscribers_does_not_panic() {
-        let bus = EventBus::new();
+        let bus = KernelEventBus::new();
         // Drop the implicit receiver immediately — subscriber_count == 0.
         let vault_id = VaultId::new();
         bus.publish(KernelEvent::VaultOpened { vault_id });
@@ -171,7 +201,7 @@ mod tests {
 
     #[tokio::test]
     async fn subscribe_then_publish_delivers_event() {
-        let bus = EventBus::new();
+        let bus = KernelEventBus::new();
         let mut rx = bus.subscribe();
 
         let vault_id = VaultId::new();
@@ -188,7 +218,7 @@ mod tests {
 
     #[tokio::test]
     async fn default_constructs_a_working_bus() {
-        let bus = EventBus::default();
+        let bus = KernelEventBus::default();
         let mut rx = bus.subscribe();
         bus.publish(KernelEvent::VaultClosed {
             vault_id: VaultId::new(),
@@ -199,7 +229,7 @@ mod tests {
 
     #[tokio::test]
     async fn clone_shares_channel() {
-        let bus = EventBus::new();
+        let bus = KernelEventBus::new();
         let bus2 = bus.clone();
         let mut rx = bus.subscribe();
 
@@ -215,6 +245,25 @@ mod tests {
     }
 
     // -------------------------------------------------------------------------
+    // Generic-instantiation: bus works for any Clone + Send + 'static payload
+    // -------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn bus_is_generic_over_payload() {
+        #[derive(Clone, Debug, PartialEq)]
+        struct Pulse(u32);
+
+        let bus: EventBus<Pulse> = EventBus::new();
+        let mut rx = bus.subscribe();
+        bus.publish(Pulse(42));
+        let pulse = timeout(Duration::from_secs(1), rx.recv())
+            .await
+            .expect("timed out")
+            .expect("recv error");
+        assert_eq!(pulse, Pulse(42));
+    }
+
+    // -------------------------------------------------------------------------
     // Step 5: Multi-subscriber integration test (1000 events, 2 receivers)
     // -------------------------------------------------------------------------
 
@@ -222,7 +271,7 @@ mod tests {
     async fn two_subscribers_receive_all_1k_events() {
         const N: usize = 1000;
 
-        let bus = Arc::new(EventBus::new());
+        let bus = Arc::new(KernelEventBus::new());
         // Create both subscriptions BEFORE publishing — use a Barrier to ensure
         // both receiver tasks are waiting before the publisher fires any events.
         let barrier = Arc::new(Barrier::new(3)); // 2 subscribers + 1 publisher
@@ -263,7 +312,7 @@ mod tests {
 
     #[tokio::test]
     async fn cancellation_exits_select_loop() {
-        let bus = EventBus::new();
+        let bus = KernelEventBus::new();
         let mut rx = bus.subscribe();
         let token = CancellationToken::new();
         let token_clone = token.clone();
