@@ -24,8 +24,8 @@ When working on a task, load the docs that match the decision you're making. Eac
 
 These two gates are **non-negotiable** for every sprint feature, without exception:
 
-**Gate 1 — After a confirmed `/plan`: invoke `/tdd` before writing any code.**
-Do not write implementation code inline. The `/tdd` skill drives all coding. If you find yourself writing code without having invoked `/tdd`, stop immediately and invoke it.
+**Gate 1 — After a confirmed `/plan`: stop and tell the user to run `/tdd` manually.**
+Do not write implementation code. Do not invoke `/tdd` automatically. When the plan is confirmed, update the plan status to `confirmed` and prompt: _"Plan confirmed. Run `/tdd [step]` to begin implementation."_ If you find yourself writing implementation code before the user has invoked `/tdd`, stop immediately and remind them to run it.
 
 **Gate 2 — Before `/sprint-update <F#> completed`: run `just ci` first.**
 Local test output is not a substitute for the full CI gate (`fmt` → `clippy` → `nextest` → `deny` → `doc`). If you find yourself about to mark a feature complete without a passing `just ci`, stop and run it.

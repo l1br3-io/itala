@@ -108,6 +108,12 @@ impl<E: Clone + Send + 'static> Clone for EventBus<E> {
 
 impl<E: Clone + Send + 'static> EventBus<E> {
     /// Create a new bus with the default ring-buffer capacity (1024).
+    ///
+    /// ```
+    /// use itala_kernel::{EventBus, KernelEvent};
+    /// let bus: EventBus<KernelEvent> = EventBus::new();
+    /// assert_eq!(bus.subscriber_count(), 0);
+    /// ```
     #[must_use]
     pub fn new() -> Self {
         let (sender, _) = broadcast::channel(BUS_CAPACITY);
@@ -118,6 +124,13 @@ impl<E: Clone + Send + 'static> EventBus<E> {
     ///
     /// The returned receiver will see all events published *after* this call.
     /// Events published before [`EventBus::subscribe`] is called are not delivered.
+    ///
+    /// ```
+    /// use itala_kernel::{EventBus, KernelEvent};
+    /// let bus: EventBus<KernelEvent> = EventBus::new();
+    /// let _rx = bus.subscribe();
+    /// assert_eq!(bus.subscriber_count(), 1);
+    /// ```
     #[must_use]
     pub fn subscribe(&self) -> broadcast::Receiver<E> {
         self.sender.subscribe()
@@ -129,12 +142,29 @@ impl<E: Clone + Send + 'static> EventBus<E> {
     /// zero-subscriber send is not an error. If the ring buffer is full,
     /// the oldest event is overwritten (subscribers may see
     /// [`tokio::sync::broadcast::error::RecvError::Lagged`]).
+    ///
+    /// ```
+    /// use itala_kernel::{EventBus, KernelEvent, VaultId};
+    /// let bus: EventBus<KernelEvent> = EventBus::new();
+    /// // Zero subscribers: publish is a silent no-op, not an error.
+    /// bus.publish(KernelEvent::VaultOpened { vault_id: VaultId::new() });
+    /// ```
     pub fn publish(&self, event: E) {
         // Ignore SendError — zero subscribers is normal at startup.
         let _ = self.sender.send(event);
     }
 
     /// Return the number of active subscribers.
+    ///
+    /// ```
+    /// use itala_kernel::{EventBus, KernelEvent};
+    /// let bus: EventBus<KernelEvent> = EventBus::new();
+    /// let rx1 = bus.subscribe();
+    /// let rx2 = bus.subscribe();
+    /// assert_eq!(bus.subscriber_count(), 2);
+    /// drop(rx1);
+    /// drop(rx2);
+    /// ```
     #[must_use]
     pub fn subscriber_count(&self) -> usize {
         self.sender.receiver_count()

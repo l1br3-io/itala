@@ -37,16 +37,16 @@ Each gate is **mandatory and ordered**. A gate may not be skipped even if prior 
 
 | Gate | Blocks | Rule |
 |---|---|---|
-| User confirms `/plan` | Writing any implementation code | Invoke `/tdd` first. No inline coding. |
+| User confirms `/plan` | Writing any implementation code | Stop. Prompt the user to run `/tdd` manually. Do not invoke it automatically. |
 | `/tdd` session complete | Running the full quality check | Run `just ci` first. |
 | `just ci` passes | Marking a feature done | Invoke `/sprint-update <F#> completed` — no other path. |
 
-If you find yourself writing implementation code without having invoked `/tdd`, stop immediately and invoke it.
+If you find yourself writing implementation code, stop immediately and prompt the user to run `/tdd`.
 If you find yourself about to call `/sprint-update completed` without a passing `just ci`, stop and run it first.
 
 ## Anti-Patterns
 
-- **Never write implementation code after a confirmed `/plan` without first invoking `/tdd`** — this is the most common bypass and it happened on F2
+- **Never write implementation code after a confirmed `/plan`** — stop, prompt the user to run `/tdd`, and wait. Do not invoke `/tdd` automatically. This is the most common bypass (it happened on F2).
 - Never mark complete on green tests alone — verify acceptance criteria
 - **Never call `/sprint-update <F#> completed` without a prior passing `just ci`** — tests passing locally is not the same as the full CI gate
 - Never code without a confirmed plan

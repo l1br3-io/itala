@@ -8,19 +8,27 @@ rust-version = "1.93.0"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-ulid         = { version = "1", features = ["serde"] }
-smol_str     = { version = "0.3", features = ["serde"] }
-thiserror    = "2"
-serde        = { version = "1", features = ["derive"] }
-camino       = { version = "1", features = ["serde1"] }
-proptest     = "1"
-serde_json   = "1"
-tokio        = { version = "1", features = ["sync"] }
-tokio-util   = "0.7"
-tokio-stream = "0.1"
-async-trait  = "0.1"
-futures      = { version = "0.3", default-features = false, features = ["std"] }
-bytes        = "1"
+ulid          = { version = "1", features = ["serde"] }
+smol_str      = { version = "0.3", features = ["serde"] }
+thiserror     = "2"
+serde         = { version = "1", features = ["derive"] }
+camino        = { version = "1", features = ["serde1"] }
+proptest      = "1"
+serde_json    = "1"
+serde-saphyr  = "=0.0.26"
+comrak        = { version = "0.52", default-features = false }
+blake3        = "1"
+time          = { version = "0.3", features = ["formatting", "parsing", "serde"] }
+insta         = { version = "1", features = ["yaml"] }
+tempfile      = "3"
+tokio         = { version = "1", features = ["sync"] }
+tokio-util    = "0.7"
+tokio-stream  = "0.1"
+async-trait   = "0.1"
+futures       = { version = "0.3", default-features = false, features = ["std"] }
+bytes         = "1"
+tracing       = "0.1"
+itala-kernel  = { path = "crates/itala-kernel" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -33,3 +41,4 @@ nursery = { level = "warn", priority = -1 }
 module_name_repetitions = "allow"
 missing_errors_doc = "allow"
 must_use_candidate = "warn"
+await_holding_lock = "deny"

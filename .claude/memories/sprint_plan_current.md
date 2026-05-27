@@ -82,7 +82,7 @@ Pipeline (`.claude/rules/workflow.md`):
 - **Rules to load:** `rules/rust/workspace.md`, `rules/rust/api-design.md`, `rules/rust/error-handling.md`, `rules/rust/ownership-and-lifetimes.md`, `rules/rust/testing.md`.
 
 #### F3. `itala-kernel` — VFS trait + event bus
-- **Status:** not-started
+- **Status:** Done (2026-05-26) — adopted pre-existing vfs.rs/events.rs under post-hoc review; added `clippy::await_holding_lock = deny` and EventBus doctests; just ci green
 - **Description:** Two cross-cutting kernel ports. `Vfs` trait (`async fn` in trait, `Send + Sync`) with `read`, `write`, `list`, `watch` over `&Utf8Path`. Event bus on `tokio::sync::broadcast` with a typed `KernelEvent` enum (`NoteSaved`, `NoteDeleted`, `VaultOpened`, `VaultClosed`). `CancellationToken`-driven shutdown integrated.
 - **Acceptance criteria:**
   - [ ] `Vfs` trait is object-safe via a generated `DynVfs` shadow using `async-trait` (per `rules/rust/async.md`), OR the kernel exposes only the native `async fn in trait` variant and documents the choice.
@@ -101,7 +101,7 @@ Pipeline (`.claude/rules/workflow.md`):
 - **Rules to load:** `rules/rust/async.md`, `rules/rust/traits-and-dispatch.md`, `rules/rust/api-design.md`.
 
 #### F4. `itala-vault` — type-state vault + frontmatter
-- **Status:** not-started
+- **Status:** Done (2026-05-27)
 - **Description:** Vault lifecycle as a typestate (`Vault<Closed>` → `Vault<Open>`). Note reading via `comrak` for Markdown and `serde_yaml` (or `yaml-rust2`) for YAML frontmatter. `Note` type holds `NoteId`, canonical `Utf8PathBuf`, `BTreeMap<String, serde_yaml::Value>` frontmatter, `Bytes` body, `blake3::Hash` checksum, `OffsetDateTime` timestamps (from `time`, not `chrono`).
 - **Acceptance criteria:**
   - [ ] `Vault<Closed>::open(root: impl Into<Utf8PathBuf>)` returns `Result<Vault<Open>>`.

@@ -1,0 +1,7 @@
+---
+source: crates/itala-vault/tests/frontmatter_snapshots.rs
+expression: fm.as_map()
+---
+author: Ångström
+emoji: 🦀
+title: 日本語タイトル

@@ -1,0 +1,11 @@
+---
+source: crates/itala-vault/tests/frontmatter_snapshots.rs
+expression: fm.as_map()
+---
+meta:
+  author: jane
+  version: 2
+tags:
+  - rust
+  - knowledge-management
+title: Nested Example

@@ -94,6 +94,8 @@ Agent (planner):
 - [ ] Acceptance criteria from the sprint feature met.
 
 **WAITING FOR CONFIRMATION**: Proceed with this plan? (yes/no/modify)
+
+> Once you confirm, the agent updates the plan status to `confirmed` and stops. Run `/tdd [step]` yourself to begin implementation.
 ```
 
 ## Plan File
@@ -142,7 +144,7 @@ Status values while active: `draft` (awaiting confirmation) → `confirmed` (use
 
 ## Important Notes
 
-**CRITICAL**: The planner agent will **NOT** write any code until you explicitly confirm the plan with "yes" or "proceed" or similar affirmative response.
+**CRITICAL**: The planner agent will **NOT** write any code — before or after confirmation. After you confirm, the agent updates the plan status to `confirmed`, outputs the prompt _"Plan confirmed. Run `/tdd [step]` to begin implementation."_, and stops. It does not invoke `/tdd` automatically.
 
 If you want changes, respond with:
 - "modify: [your changes]"
@@ -152,7 +154,7 @@ If you want changes, respond with:
 ## Integration with Other Commands
 
 After planning:
-- Use `/tdd` to implement with test-driven development
+- **You** run `/tdd` to implement (the agent will not invoke it automatically)
 - Use `/code-review` to review the diff after `just ci` passes
 - Use `/pr-review` when raising the PR
 
