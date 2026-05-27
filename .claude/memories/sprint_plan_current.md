@@ -125,7 +125,7 @@ Pipeline (`.claude/rules/workflow.md`):
 - **Rules to load:** `rules/rust/traits-and-dispatch.md` (typestate), `rules/rust/api-design.md`, `rules/rust/error-handling.md`, `rules/rust/testing.md`.
 
 #### F5. `itala-vault` — local filesystem adapter
-- **Status:** not-started
+- **Status:** Done (2026-05-27)
 - **Description:** Concrete `Vfs` implementation against the local filesystem. Implemented as `crates/itala-vault/src/adapters/local.rs` per `rules/rust/workspace.md` ("Concrete adapter (filesystem, S3, OpenAI) → that context's `adapters/` dir"). Path safety: all paths are vault-root-relative `Utf8Path`s; absolute paths and `..` traversal are rejected. File watcher via `notify` crate, debounced through `notify-debouncer-mini`, surfaced as a `Stream<Item = VfsEvent>`.
 - **Acceptance criteria:**
   - [ ] `LocalFsVfs::new(root: Utf8PathBuf)` constructs successfully when `root` exists.

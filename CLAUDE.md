@@ -27,8 +27,8 @@ These two gates are **non-negotiable** for every sprint feature, without excepti
 **Gate 1 — After a confirmed `/plan`: stop and tell the user to run `/tdd` manually.**
 Do not write implementation code. Do not invoke `/tdd` automatically. When the plan is confirmed, update the plan status to `confirmed` and prompt: _"Plan confirmed. Run `/tdd [step]` to begin implementation."_ If you find yourself writing implementation code before the user has invoked `/tdd`, stop immediately and remind them to run it.
 
-**Gate 2 — Before `/sprint-update <F#> completed`: run `just ci` first.**
-Local test output is not a substitute for the full CI gate (`fmt` → `clippy` → `nextest` → `deny` → `doc`). If you find yourself about to mark a feature complete without a passing `just ci`, stop and run it.
+**Gate 2 — Before `/sprint-update <F#> completed`: the user must report a passing `just ci`.**
+Local test output is not a substitute for the full CI gate (`fmt` → `clippy` → `nextest` → `deny` → `doc`). Never run `just ci` yourself. If the user has not yet reported a passing `just ci`, stop and output: _"Run `just ci` and report back before I mark this complete."_
 
 Full pipeline: `/sprint-plan` → `/capability` → `/plan` → `/tdd` → `just ci` → `/sprint-update`
 

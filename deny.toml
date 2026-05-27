@@ -2,11 +2,15 @@
 version = 2
 # BSD-2-Clause: arrayref (blake3 dep) + comrak — both OSI-approved, FSF Free/Libre.
 # Unicode-DFS-2016: finl_unicode (comrak dep) — OSI-approved Unicode data-files license.
+# ISC: inotify-sys, file-id (notify transitive deps) — OSI-approved, functionally MIT.
+# CC0-1.0: notify-types — public-domain dedication, no restrictions.
 allow = [
     "MIT",
     "Apache-2.0",
     "BSD-2-Clause",
     "BSD-3-Clause",
+    "ISC",
+    "CC0-1.0",
     "MPL-2.0",
     "Zlib",
     "Unicode-3.0",

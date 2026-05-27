@@ -50,3 +50,33 @@ jobs:
       # Gate 6
       - name: doc
         run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
+
+  # Cross-platform watcher tests — runs on macOS and Windows when the adapter
+  # source changes to verify OS-level filesystem events fire correctly.
+  watcher:
+    name: Watcher (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    if: github.event_name == 'pull_request'
+
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.93.0"
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - name: Watcher integration tests
+        run: cargo nextest run -p itala-vault --test local_fs_vfs

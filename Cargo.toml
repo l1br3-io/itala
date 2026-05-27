@@ -25,10 +25,17 @@ tokio         = { version = "1", features = ["sync"] }
 tokio-util    = "0.7"
 tokio-stream  = "0.1"
 async-trait   = "0.1"
+notify                = "8"
+notify-debouncer-full = "0.6"
 futures       = { version = "0.3", default-features = false, features = ["std"] }
 bytes         = "1"
 tracing       = "0.1"
+anyhow        = "1"
+clap          = { version = "4", features = ["derive"] }
+assert_cmd    = "2"
+predicates    = "3"
 itala-kernel  = { path = "crates/itala-kernel" }
+itala-vault   = { path = "crates/itala-vault" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -12,6 +12,20 @@ instructions: |
   - The relevant `rules/rust/*` for the feature area
   - `.claude/memories/sprint_plan_current.md` and `.claude/memories/phase-status.md`
 
+  ## Session Mode
+
+  Every `/plan` invocation runs inside a **plan mode session**:
+
+  1. Call `EnterPlanMode` immediately — this signals you are in plan mode and no code will be written.
+  2. Explore the codebase (read files, grep symbols, check sprint plan) as needed.
+  3. Draft the full plan in memory.
+  4. Write the plan to `.claude/plans/<id>.md` with `status: draft` (see Plan File format below).
+  5. Call `ExitPlanMode` — the user reviews and approves, modifies, or rejects.
+  6. On approval: update the file status to `confirmed`, output _"Plan confirmed. Run `/tdd [step]` to begin implementation."_, and stop.
+  7. On "modify": revise the plan file, then call `ExitPlanMode` again.
+
+  Never write implementation code during or after plan mode.
+
   ## Planning Process
 
   1. **Requirements Analysis**
@@ -84,6 +98,31 @@ instructions: |
   - [ ] Performance budgets in `docs/ARCHITECTURE.md` §4.1 hold
   - [ ] Acceptance criteria from the sprint feature met
   ```
+
+  ## Plan File Format
+
+  Write to `.claude/plans/<id>.md` **before** calling `ExitPlanMode`.
+
+  Naming:
+  - Sprint feature in scope → `<feature-id>_<slug>.md` (e.g. `F3_kernel-vfs.md`)
+  - No sprint feature → `<YYYY-MM-DD>_<slug>.md` (e.g. `2026-05-27_backlinks-panel.md`)
+
+  ```markdown
+  ---
+  id: F3_kernel-vfs
+  feature: F3          # omit if no sprint feature
+  date: 2026-05-27
+  status: draft        # draft | confirmed | in-progress
+  ---
+
+  # Plan: <title>
+  …
+  ```
+
+  Status lifecycle (you own `draft` → `confirmed`; `/tdd` owns `in-progress`; `/sprint-update` deletes):
+  - `draft` — written by you, awaiting user approval
+  - `confirmed` — updated by you after user approves via `ExitPlanMode`
+  - `in-progress` — set by `/tdd` when implementation begins
 
   ## Rules
   1. Be specific — exact crate names, file paths, function names, type names

@@ -8,10 +8,20 @@ This command invokes the **planner** agent to create a comprehensive implementat
 
 ## What This Command Does
 
-1. **Restate Requirements** - Clarify what needs to be built
-2. **Identify Risks** - Surface potential issues and blockers
-3. **Create Step Plan** - Break down implementation into phases
-4. **Wait for Confirmation** - MUST receive user approval before proceeding
+1. **Enter plan mode** - Session switches to plan mode (no code written)
+2. **Restate Requirements** - Clarify what needs to be built
+3. **Identify Risks** - Surface potential issues and blockers
+4. **Create Step Plan** - Break down implementation into phases
+5. **Write plan to file** - Saved to `.claude/plans/<id>.md` with `status: draft`
+6. **Exit plan mode** - Present the plan for user approval
+
+## Session Modes
+
+The `/plan` command is always run inside a **plan mode session**:
+
+- **Plan mode** (active during drafting): `EnterPlanMode` is called first. The agent explores the codebase and drafts the plan. No code is written. The plan is saved to `.claude/plans/<id>.md` with `status: draft`.
+- **Approval gate**: `ExitPlanMode` is called once the file is written. The user sees the plan and explicitly approves, modifies, or rejects it.
+- **Confirmed**: On approval the plan status is updated to `confirmed` and the agent outputs: _"Plan confirmed. Run `/tdd [step]` to begin implementation."_ No code is written. The session is done.
 
 ## When to Use
 
@@ -26,13 +36,14 @@ Use `/plan` when:
 
 The planner agent will:
 
-1. **Analyze the request** and restate requirements in clear terms
-2. **Break down into phases** with specific, actionable steps
-3. **Identify dependencies** between components
-4. **Assess risks** and potential blockers
-5. **Estimate complexity** (High/Medium/Low)
-6. **Save the plan** to `.claude/plans/` with a stable ID (see § Plan File below)
-7. **Present the plan** and WAIT for your explicit confirmation
+1. **Call `EnterPlanMode`** — enters plan mode; no code will be written
+2. **Analyze the request** and restate requirements in clear terms
+3. **Break down into phases** with specific, actionable steps
+4. **Identify dependencies** between components
+5. **Assess risks** and potential blockers
+6. **Estimate complexity** (High/Medium/Low)
+7. **Write the plan** to `.claude/plans/<id>.md` with `status: draft` (see § Plan File below)
+8. **Call `ExitPlanMode`** — presents the plan and waits for your explicit approval
 
 ## Example Usage
 
@@ -100,7 +111,7 @@ Agent (planner):
 
 ## Plan File
 
-Every plan is saved to `.claude/plans/` **before** asking for confirmation so it survives a lost terminal. It is a **working document** — active only while the feature is in flight. When `/sprint-update <F#> completed` runs, the file is deleted automatically.
+Every plan is written to `.claude/plans/` during plan mode (before `ExitPlanMode`) so it survives a lost terminal. It is a **working document** — active only while the feature is in flight. When `/sprint-update <F#> completed` runs, the file is deleted automatically.
 
 ### Naming
 
@@ -144,7 +155,12 @@ Status values while active: `draft` (awaiting confirmation) → `confirmed` (use
 
 ## Important Notes
 
-**CRITICAL**: The planner agent will **NOT** write any code — before or after confirmation. After you confirm, the agent updates the plan status to `confirmed`, outputs the prompt _"Plan confirmed. Run `/tdd [step]` to begin implementation."_, and stops. It does not invoke `/tdd` automatically.
+**CRITICAL**: The planner agent will **NOT** write any code at any point. The full lifecycle is:
+1. `EnterPlanMode` → explore → write `.claude/plans/<id>.md` (status: `draft`) → `ExitPlanMode`
+2. User approves → agent updates status to `confirmed` and outputs _"Plan confirmed. Run `/tdd [step]` to begin implementation."_ → stops.
+3. User says modify → agent stays in plan mode, revises the file, calls `ExitPlanMode` again.
+
+It does not invoke `/tdd` automatically.
 
 If you want changes, respond with:
 - "modify: [your changes]"

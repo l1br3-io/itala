@@ -47,7 +47,8 @@
       "Bash(RUSTDOCFLAGS=\"-D warnings\" cargo doc --no-deps -p itala-kernel)",
       "Bash(printf *)",
       "Bash(python3 *)",
-      "Bash(INSTA_UPDATE=always cargo nextest run -p itala-vault --test frontmatter_snapshots)"
+      "Bash(INSTA_UPDATE=always cargo nextest run -p itala-vault --test frontmatter_snapshots)",
+      "Bash(RUSTDOCFLAGS=\"-D warnings\" cargo doc --no-deps --workspace)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -124,8 +124,6 @@ impl Vault<Open> {
 ///
 /// # Errors
 /// Returns [`Error::PathEscape`] if the path is absolute or contains `..`.
-// Used by write-path operations (F5+); dead_code suppressed until then.
-#[allow(dead_code)]
 pub fn validate_relative(root: &Utf8Path, candidate: &Utf8Path) -> Result<Utf8PathBuf> {
     if candidate.is_absolute() {
         return Err(Error::PathEscape {
