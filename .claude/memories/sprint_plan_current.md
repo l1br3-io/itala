@@ -237,26 +237,33 @@ Pipeline (`.claude/rules/workflow.md`):
 - **Complexity:** Low-Medium
 - **Depends on:** F4, F5
 
-#### F12. `NoteStore` seam + `FsNoteStore` refactor
+#### F12. `StorageProvider` seam + `FileProvider` + `NoteStore`-over-provider
 - **Status:** not-started
-- **Description:** Raise vault's abstraction from "bytes by path" to "notes by id." Introduce the `NoteStore` trait in `itala-vault` with `list`, `read`, `write`, `delete`, `query`, and `fs_location_of`. Refactor `Vault<Open>` to hold `Arc<dyn DynNoteStore>` and relocate today's vault.rs logic (path scanning, frontmatter split, id backfill, duplicate detection) verbatim into `FsNoteStore`. This is a behavior-preserving relocation — all existing tests must pass unchanged. Also adds `write`/`delete` as the first mutating vault API, with `FsNoteStore::write` doing atomic temp→rename via `LocalFsVfs`. Designed in `~/.claude/plans/as-a-product-owner-merry-pnueli.md`.
+- **Description:** Introduce the single **swappable storage seam** that the whole app will persist through. The product goal: a user picks one backend and notes, config, history, and plugin-state all flow through it; a backend author implements **one** adapter (e.g. MySQL) and everything works. Three layers:
+  1. **Provider seam** — `StorageProvider` trait in `itala-kernel` (domain-agnostic "collections of records"), sitting alongside `Vfs`. CORE methods every backend implements: `get`/`put`/`delete`/`list` over `(collection, key)` + `capabilities()`. OPTIONAL methods guarded by `ProviderCapabilities` (host falls back when absent): `query(collection, &Filter)` and `transaction(Vec<WriteOp>)`. `Record { key: String, indexed: BTreeMap<String, FrontmatterValue>, blob: Bytes }` — `indexed` holds queryable fields a backend may index; `blob` is the opaque payload. Object-safe `DynStorageProvider` shadow (async-trait + blanket impl) mirroring `Vfs`/`DynVfs`, `Send` bound explicit. **Capability negotiation** is what keeps the contract tiny (anyone can write an adapter) while still allowing native DB queries (smart backends advertise `native_query`/`transactions`; the host uses the fast path).
+  2. **`FileProvider`** (in `itala-vault` adapters, over `Arc<dyn DynVfs>`; `native_query=false` → host-side scan+filter). Relocates today's `vault.rs` note logic (`collect_md_paths`, `resolve_id_for`, frontmatter split, `id:` backfill, duplicate detection) **verbatim** — the regression contract.
+  3. **`NoteStore`** — a single host-side domain impl in `itala-vault` over `Arc<dyn DynStorageProvider>` (NOT per-backend). Owns the Note↔Record mapping (`indexed`: tags+title; `blob`: frontmatter+body), adds `write`/`delete` (first mutating surface) + minimal `NoteQuery` (tag + title-substring). `Vault<Open>` delegates to `NoteStore`.
+  WASM/plugin exposure of `StorageProvider` is explicitly **DEFERRED** until `itala-plugin-host` exists (see F15); the trait is internal (not `itala-plugin-api`, not under the semver freeze). Designed in the `/capability` discussion superseding `~/.claude/plans/as-a-product-owner-merry-pnueli.md`.
 - **Acceptance criteria:**
-  - [ ] `NoteStore` trait declared in `itala-vault` with a `DynNoteStore` shadow (async-trait + blanket impl), `Send` bound explicit.
-  - [ ] `NoteQuery` struct with tag-filter and title-substring fields; no speculative extras.
-  - [ ] `FsNoteStore` wraps `Arc<dyn DynVfs>` and passes all existing `vault_lifecycle.rs` and `identity_persistence.rs` tests unchanged.
-  - [ ] `Vault<Open>` holds `Arc<dyn DynNoteStore>` — `LocalFsVfs` and `MemoryVfs` still work as before (now under `FsNoteStore`).
-  - [ ] `write` round-trip test: write 10 notes → read each → frontmatter + body + checksum match.
-  - [ ] `delete` test: write note → delete → `read` returns `Error::NotFound`.
-  - [ ] `fs_location_of` returns `Some` from `FsNoteStore`; documented as `None` for DB backends.
-  - [ ] Compile-time `assert_send_sync` + `assert_unpin` for `FsNoteStore` and `Arc<dyn DynNoteStore>`.
-  - [ ] `just ci` green (no new `cargo deny` blocks expected; no new deps for the FS path).
+  - [ ] `StorageProvider` in `itala-kernel` with CORE `get`/`put`/`delete`/`list` + `capabilities()`; OPTIONAL `query`/`transaction` guarded by `ProviderCapabilities`. References no domain types (kernel gains no vault dep).
+  - [ ] `Record { key, indexed, blob }`, `Filter`, `ProviderCapabilities`, `WriteOp` defined; `DynStorageProvider` async-trait shadow + blanket impl; `Send` bound explicit; `assert_send_sync` + `assert_unpin` for `FileProvider` and `Arc<dyn DynStorageProvider>`.
+  - [ ] `FileProvider` over `Arc<dyn DynVfs>`; `native_query=false`; host-side scan+filter fallback for `query`.
+  - [ ] `NoteStore` (single impl) over `Arc<dyn DynStorageProvider>`; Note↔Record mapping round-trips frontmatter + body + checksum losslessly.
+  - [ ] **Regression contract:** `tests/vault_lifecycle.rs` and `tests/identity_persistence.rs` pass **unchanged** against `NoteStore`-over-`FileProvider`; `Vault::<Closed>::new(Arc<dyn DynVfs>, root)` still compiles and works (wraps VFS→`FileProvider`→`NoteStore` internally).
+  - [ ] `write` round-trip: write 10 notes → read each → frontmatter + body + checksum match. `delete`: write → delete → `read` returns `Error::NotFound`.
+  - [ ] `NoteQuery` (tag + title-substring) returns correct sets via the host-side fallback path.
+  - [ ] `fs_location_of` returns `Some` for `FileProvider`; documented `None` for non-FS providers.
+  - [ ] `just ci` green (no new deps for the FS path).
 - **Files:**
-  - `crates/itala-vault/src/note_store.rs` (new — trait + `DynNoteStore` + `NoteQuery`)
-  - `crates/itala-vault/src/adapters/fs.rs` (new — `FsNoteStore`)
-  - `crates/itala-vault/src/vault.rs` (modify — swap `DynVfs` for `DynNoteStore`)
+  - `crates/itala-kernel/src/store.rs` (new — `StorageProvider`, `Record`, `Filter`, `ProviderCapabilities`, `WriteOp`, `DynStorageProvider`)
+  - `crates/itala-kernel/src/lib.rs` (re-exports)
+  - `crates/itala-vault/src/note_store.rs` (new — `NoteStore`, `NoteQuery`, Note↔Record mapping)
+  - `crates/itala-vault/src/adapters/file.rs` (new — `FileProvider`; absorbs today's `vault.rs` note logic)
+  - `crates/itala-vault/src/vault.rs` (modify — delegate to `NoteStore`; `new` wraps VFS→`FileProvider`)
   - `crates/itala-vault/src/lib.rs` (re-exports)
-- **Complexity:** Medium-High
-- **Depends on:** F6 (write surface exposed in CLI), F5.5
+- **Complexity:** High
+- **Depends on:** F6, F5.5
+- **Rules to load:** `rules/rust/traits-and-dispatch.md` (assoc-vs-generic, sealed, dyn-compat), `rules/rust/async.md` (Send-leak, async-trait shadow), `rules/rust/api-design.md`, `rules/rust/error-handling.md`.
 
 ---
 
@@ -278,38 +285,75 @@ Pipeline (`.claude/rules/workflow.md`):
 - **Depends on:** F3, F5
 - **Note:** Out of strict Foundation scope; tracked so the threat model isn't forgotten when designing the VFS trait surface.
 
-#### F13. `PostgresNoteStore` (feature-gated)
+#### F13. `PostgresProvider` (feature-gated)
 - **Status:** not-started
-- **Description:** Native Postgres implementation of `NoteStore`. Located at `crates/itala-vault/src/adapters/postgres.rs` behind an optional `postgres` feature (off by default). Uses `sqlx` with `runtime-tokio` + `tls-rustls` (never `native-tls`/`openssl-sys`), the `time` feature (not `chrono`), and connection string via `secrecy::SecretString` sourced from `DATABASE_URL`. Schema in a `sqlx` migration: `note` table with `id TEXT PK` (ULID), `title`, `tags TEXT[]`, `frontmatter JSONB`, `body BYTEA`, `checksum BYTEA`, `created_at`/`modified_at TIMESTAMPTZ`. GIN index on `tags`. `list` → `SELECT id FROM note`, `read` → typed row → `Note`, `write` → upsert, `delete` → `DELETE`, `query` → real SQL. `fs_location_of` → `Ok(None)`. Closes the `UNIX_EPOCH` timestamp gap. Designed in `~/.claude/plans/as-a-product-owner-merry-pnueli.md`.
+- **Description:** Native Postgres implementation of **`StorageProvider`** (not a note-specific store). Located at `crates/itala-vault/src/adapters/postgres.rs` behind an optional `postgres` feature (off by default). Uses a **generic record schema** (supersedes the prior bespoke `note` table — accepted cost of "one adapter for everything"): a single `record` table keyed by `(collection, key)`, with `indexed JSONB` (+ GIN) and `blob BYTEA`. Advertises `native_query=true` + `transactions=true`. `sqlx` with `runtime-tokio` + `tls-rustls` (never `native-tls`/`openssl-sys`), the `time` feature (not `chrono`), connection string via `secrecy::SecretString` from `DATABASE_URL`; never logged. **Because every domain rides `StorageProvider`, `NoteStore` (and later `ConfigStore`/`HistoryStore`) work through Postgres with zero domain-store changes** — the backend swap is one config line. Real `created_at`/`modified_at` close the `UNIX_EPOCH` gap.
+- **Schema (sqlx migration):**
+  ```sql
+  CREATE TABLE record (
+    collection  TEXT  NOT NULL,
+    key         TEXT  NOT NULL,
+    indexed     JSONB NOT NULL DEFAULT '{}',
+    blob        BYTEA NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    modified_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (collection, key)
+  );
+  CREATE INDEX record_indexed_idx ON record USING GIN (indexed);
+  ```
 - **Acceptance criteria:**
-  - [ ] `PostgresNoteStore` implements `NoteStore` + `DynNoteStore`.
-  - [ ] `sqlx` configured with `runtime-tokio` + `tls-rustls`; `cargo deny check` passes after allowlist updates.
-  - [ ] Migration creates `note` table + `note_tags_idx` GIN index.
-  - [ ] Round-trip test (via `sqlx::test` + testcontainers): write 100 notes → `list` → `read` each → fields/checksums match.
-  - [ ] `query` returns correct sets for tag-filter and title-ILIKE cases.
+  - [ ] `PostgresProvider` implements `StorageProvider` + `DynStorageProvider`; `capabilities()` advertises `native_query` + `transactions`.
+  - [ ] `sqlx` with `runtime-tokio` + `tls-rustls`; `cargo deny check` passes after allowlist updates.
+  - [ ] Migration creates the `record` table + `record_indexed_idx` GIN index.
+  - [ ] `get`/`put`(upsert `ON CONFLICT`)/`delete`/`list` map to single statements; `put` sets `modified_at = now()`.
+  - [ ] `NoteStore` over `PostgresProvider` passes the **same** round-trip suite as over `FileProvider` (write 100 → `list` → `read` → fields/checksums match), via `sqlx::test`/testcontainers.
+  - [ ] `query` translates `Filter` to SQL over `indexed` JSONB (containment + ILIKE); returns correct sets for tag and title cases.
+  - [ ] `transaction(Vec<WriteOp>)` commits atomically in one Pg transaction.
   - [ ] `created_at`/`modified_at` are real timestamps (not `UNIX_EPOCH`).
-  - [ ] `vault::Error` gains `#[from] sqlx::Error` variant (`Database`); `DuplicateNoteId` stays FS-scoped.
-  - [ ] Compile-time `assert_send_sync` for `PostgresNoteStore` and `Arc<dyn DynNoteStore>` covering the Postgres impl.
-  - [ ] Connection string (`DATABASE_URL`) sourced from env; never logged.
+  - [ ] Provider errors surface through a backend-agnostic `itala-kernel` error variant (e.g. `Provider(Box<dyn Error + Send + Sync>)`) — **no `sqlx` dependency in `itala-kernel`**; `PostgresProvider` maps `sqlx::Error` into it. FS-specific `DuplicateNoteId` stays FS-scoped.
+  - [ ] `assert_send_sync` for `PostgresProvider` and `Arc<dyn DynStorageProvider>` covering this impl.
+  - [ ] `DATABASE_URL` via `SecretString` from env; never logged.
   - [ ] `just ci` green; `cargo nextest run -p itala-vault --features postgres` passes against testcontainers Postgres.
 - **Files:**
   - `crates/itala-vault/src/adapters/postgres.rs` (new — behind `#[cfg(feature = "postgres")]`)
   - `crates/itala-vault/migrations/` (new — `sqlx` migration files)
   - `crates/itala-vault/Cargo.toml` (optional `postgres` feature + sqlx dep)
-  - `crates/itala-vault/src/error.rs` (new `Database` variant)
+  - `crates/itala-kernel/src/error.rs` (new backend-agnostic `Provider` variant)
   - `deny.toml` (allowlist widening for sqlx/rustls tree)
 - **Complexity:** High
 - **Depends on:** F12
+
+#### F14. `ConfigStore` + `HistoryStore` over the provider (sketch)
+- **Status:** not-started
+- **Description:** Move config (`itala.toml` settings) and version history onto `StorageProvider` so they ride the user's chosen backend automatically. `ConfigStore` keeps a singleton `load`/`save` shape (collection `"config"`); `HistoryStore` is a versioned append-log (collection `"history"`, key `"<note-id>:<version>"`). Each is host-side domain code over `Arc<dyn DynStorageProvider>` — **no per-backend impls**. This is the payoff of the seam: config/history work on Postgres for free once written, and proves the contract generalizes beyond notes (the test of whether the generic seam was the right shape).
+- **Acceptance criteria sketch:**
+  - [ ] `ConfigStore` round-trips settings through any provider; FS and Postgres give identical results.
+  - [ ] `HistoryStore` append/list-versions/read-version/prune work over the provider; retention honored.
+  - [ ] No new provider methods required — both fit CORE + optional `query`.
+- **Depends on:** F12, F7 (history semantics)
+- **Note:** Tracked, not pulled forward. Confirms the seam shape against a second and third domain.
+
+#### F15. `StorageProvider` as a WASM plugin contract (sketch)
+- **Status:** not-started
+- **Description:** Promote the internal `StorageProvider` Rust trait to a WIT-defined plugin interface so third-party backends (e.g. MySQL, cloud) are user-installable plugins — the "just change this adapter" end-state. Capability negotiation (`native_query`/`transactions`) crosses the WASM boundary. Once exposed, this interface falls under the `itala-plugin-api` semver freeze.
+- **Depends on:** F12, `itala-plugin-host` (separate phase)
+- **Note:** Deferred until the plugin host exists; do **not** pull forward. The internal trait shape in F12 should anticipate this (kebab-case-able names, no host-only types in the contract).
+
+#### F16. User-facing storage selection + bootstrap tier (sketch)
+- **Status:** not-started
+- **Description:** Let the user choose their backend (file / postgres / plugin) and switch it. Selection, connection secret (`SecretString`), and the provider plugin binary live in a **local primitive tier** (file/keyring) — they cannot live behind the provider they configure (the bootstrap loop). CLI/desktop surface to pick and migrate.
+- **Depends on:** F12, F13
+- **Note:** The bootstrap exception from the storage design — only the storage *selection* + provider *code* stay local; all domain data rides the chosen provider.
 
 ---
 
 ## Dependency graph
 
 ```
-F1 ─┬─► F2 ─┬─► F3 ─┬─► F4 ─┬─► F5 ──► F6 ──► F12 (S2) ──► F13 (S3)
-    │       │       │       │
-    │       │       │       └─► F7 (S2)
-    │       │       │
+F1 ─┬─► F2 ─┬─► F3 ─┬─► F4 ─┬─► F5 ──► F6 ──► F12 (S2) ─┬─► F13 (S3, PostgresProvider)
+    │       │       │       │                            ├─► F14 (S3, Config/History stores)
+    │       │       │       └─► F7 (S2)                  ├─► F15 (WASM plugin contract — needs plugin-host)
+    │       │       │                                    └─► F16 (storage selection + bootstrap)
     │       │       └─► F9 (S2)
     │       │
     │       └─► F8 (S2)
@@ -318,7 +362,7 @@ F1 ─┬─► F2 ─┬─► F3 ─┬─► F4 ─┬─► F5 ──► F6 
 ```
 
 Critical path: F1 → F2 → F3 → F4 → F5 → F6. Sprint 1 ships when F1–F6 are `completed`.
-Storage backend path: F6 → F12 (NoteStore seam) → F13 (Postgres).
+Storage backend path: F6 → **F12 (`StorageProvider` seam + `FileProvider` + `NoteStore`)** → { F13 PostgresProvider · F14 Config/History stores · F15 WASM plugin contract · F16 selection+bootstrap }. F12 is the one seam every domain and every backend rides.
 
 ---
 
