@@ -48,7 +48,8 @@
       "Bash(printf *)",
       "Bash(python3 *)",
       "Bash(INSTA_UPDATE=always cargo nextest run -p itala-vault --test frontmatter_snapshots)",
-      "Bash(RUSTDOCFLAGS=\"-D warnings\" cargo doc --no-deps --workspace)"
+      "Bash(RUSTDOCFLAGS=\"-D warnings\" cargo doc --no-deps --workspace)",
+      "Bash(xxd /home/jpt/src/oss/l1br3/itala/crates/itala-cli/tests/fixtures/sample-vault/05-crlf.md)"
     ]
   },
   "enableAllProjectMcpServers": true,

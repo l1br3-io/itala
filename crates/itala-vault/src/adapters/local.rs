@@ -23,11 +23,37 @@ use tokio_stream::wrappers::ReceiverStream;
 use ulid::Ulid;
 
 use crate::error::Result as VaultResult;
-use crate::vault::validate_relative;
 
 // `itala_kernel::Result<T>` is the return type for all Vfs methods.
 // We use the full path to avoid shadowing `VaultResult`.
 type KernelResult<T> = itala_kernel::Result<T>;
+
+// ---------------------------------------------------------------------------
+// Path-escape guard — used only by LocalFsVfs::join_path
+// ---------------------------------------------------------------------------
+
+/// Validate that `candidate` is relative and contains no `..` segments.
+///
+/// Returns the joined absolute path (root + candidate) on success.
+///
+/// # Errors
+/// Returns [`crate::Error::PathEscape`] if the path is absolute or contains `..`.
+fn validate_relative(root: &Utf8Path, candidate: &Utf8Path) -> VaultResult<Utf8PathBuf> {
+    if candidate.is_absolute() {
+        return Err(crate::Error::PathEscape {
+            path: candidate.to_owned(),
+        });
+    }
+    for component in candidate.components() {
+        use camino::Utf8Component;
+        if matches!(component, Utf8Component::ParentDir) {
+            return Err(crate::Error::PathEscape {
+                path: candidate.to_owned(),
+            });
+        }
+    }
+    Ok(root.join(candidate))
+}
 
 // ---------------------------------------------------------------------------
 // Public type
@@ -445,6 +471,36 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    // -- validate_relative (co-located with the only caller) --
+
+    #[test]
+    fn validate_relative_rejects_absolute() {
+        let root = Utf8Path::new("/vault");
+        let err = validate_relative(root, Utf8Path::new("/etc/passwd")).unwrap_err();
+        assert!(matches!(err, crate::Error::PathEscape { .. }));
+    }
+
+    #[test]
+    fn validate_relative_rejects_dotdot_direct() {
+        let root = Utf8Path::new("/vault");
+        let err = validate_relative(root, Utf8Path::new("../etc")).unwrap_err();
+        assert!(matches!(err, crate::Error::PathEscape { .. }));
+    }
+
+    #[test]
+    fn validate_relative_rejects_dotdot_nested() {
+        let root = Utf8Path::new("/vault");
+        let err = validate_relative(root, Utf8Path::new("foo/../bar")).unwrap_err();
+        assert!(matches!(err, crate::Error::PathEscape { .. }));
+    }
+
+    #[test]
+    fn validate_relative_accepts_plain_path() {
+        let root = Utf8Path::new("/vault");
+        let joined = validate_relative(root, Utf8Path::new("notes/hello.md")).unwrap();
+        assert_eq!(joined, Utf8PathBuf::from("/vault/notes/hello.md"));
+    }
 
     async fn new_vfs() -> (LocalFsVfs, TempDir) {
         let dir = TempDir::new().unwrap();

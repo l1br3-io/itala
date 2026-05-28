@@ -91,3 +91,13 @@ Default visibility is `pub(crate)`. Promote to `pub` only when a consumer outsid
 | wasmtime runtime + sandbox | `itala-plugin-host` |
 | Anything specific to a bounded context | that context's crate |
 | Concrete adapter (filesystem, S3, OpenAI) | `itala-{context}/src/adapters/` or its own crate if reused |
+
+## Bounded-context consumption
+
+Downstream context crates (`itala-search`, `itala-graph`, `itala-sync`, `itala-publish`, `itala-ai`) consume notes as `&Note`, `&[Note]`, or `NoteId` — never `&Vault` and never `&Utf8Path`. The vault crate hands out semantic data; consumers do not reach into storage.
+
+FS-shaped accessors on `Vault` and `Note` are explicitly `Option`-returning and intended for FS-aware shells (CLI, desktop) only:
+- `Vault::fs_location_of(id) -> Result<Option<Utf8PathBuf>>`
+- `Note::fs_location() -> Option<&Utf8Path>`
+
+*Why:* keeps a future second note backend (encrypted blob, remote, database) additive rather than breaking. If a downstream crate stores `Utf8Path` today, adding that backend forces changes everywhere; if it stores `NoteId`, nothing changes.

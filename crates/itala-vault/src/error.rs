@@ -52,6 +52,27 @@ pub enum Error {
     /// An I/O error from the underlying operating system.
     #[error("io")]
     Io(#[from] std::io::Error),
+
+    /// The `id:` frontmatter field is present but its value cannot be parsed as a [`NoteId`].
+    #[error("frontmatter `id:` is not a valid NoteId: {value}")]
+    InvalidFrontmatterId {
+        /// The raw value that failed to parse.
+        value: String,
+    },
+
+    /// Two notes in the same vault carry the same `id:` in their frontmatter.
+    ///
+    /// Raised by FS-backed vault scanners.  The payload fields are
+    /// FS-specific context; they are not meaningful for non-FS backends.
+    #[error("duplicate note id {id}: found in both {first_fs_location} and {second_fs_location}")]
+    DuplicateNoteId {
+        /// The repeated id.
+        id: NoteId,
+        /// First vault-root-relative path where the id was found (FS-backed vaults only).
+        first_fs_location: Utf8PathBuf,
+        /// Second vault-root-relative path where the same id was found (FS-backed vaults only).
+        second_fs_location: Utf8PathBuf,
+    },
 }
 
 /// Convenience alias for `Result<T, vault::Error>`.
@@ -103,6 +124,51 @@ mod tests {
     fn body_not_utf8_display() {
         let msg = Error::BodyNotUtf8.to_string();
         assert!(msg.contains("utf-8"));
+    }
+
+    #[test]
+    fn invalid_frontmatter_id_display() {
+        let err = Error::InvalidFrontmatterId {
+            value: "not-a-ulid".to_owned(),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("not-a-ulid"));
+        assert!(msg.contains("NoteId") || msg.contains("id"));
+    }
+
+    #[test]
+    fn duplicate_note_id_display() {
+        let id = NoteId::new();
+        let err = Error::DuplicateNoteId {
+            id,
+            first_fs_location: Utf8PathBuf::from("a.md"),
+            second_fs_location: Utf8PathBuf::from("b.md"),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("a.md"));
+        assert!(msg.contains("b.md"));
+    }
+
+    #[test]
+    fn duplicate_note_id_field_names_carry_fs_scope() {
+        let id = NoteId::new();
+        let err = Error::DuplicateNoteId {
+            id,
+            first_fs_location: Utf8PathBuf::from("notes/a.md"),
+            second_fs_location: Utf8PathBuf::from("notes/b.md"),
+        };
+        // Field names must be matchable with the fs_location suffix.
+        if let Error::DuplicateNoteId {
+            first_fs_location,
+            second_fs_location,
+            ..
+        } = err
+        {
+            assert_eq!(first_fs_location.as_str(), "notes/a.md");
+            assert_eq!(second_fs_location.as_str(), "notes/b.md");
+        } else {
+            panic!("wrong variant");
+        }
     }
 
     #[test]

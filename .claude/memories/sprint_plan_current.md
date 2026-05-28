@@ -124,6 +124,27 @@ Pipeline (`.claude/rules/workflow.md`):
 - **Depends on:** F2, F3
 - **Rules to load:** `rules/rust/traits-and-dispatch.md` (typestate), `rules/rust/api-design.md`, `rules/rust/error-handling.md`, `rules/rust/testing.md`.
 
+#### F5.5. `itala-vault` — persistent `NoteId` via frontmatter `id:` field
+- **Status:** Done (2026-05-28)
+- **Description:** Note identity is now stable across renames. The `id:` YAML frontmatter field is authoritative; notes without it are lazily backfilled on first `list`/`path_of`/`read`. Duplicate id detection in `list` and `path_of`. `Frontmatter::emit` hand-rolls canonical YAML (always double-quotes strings). `inject_id` rewrites raw bytes atomically. Two new error variants: `InvalidFrontmatterId` and `DuplicateNoteId`.
+- **Acceptance criteria:**
+  - [x] `list` backfills `id:` into notes that lack it; subsequent reads return the same id.
+  - [x] Renaming a file (copy + delete) does not change the `NoteId` once `id:` is in frontmatter.
+  - [x] Two notes with identical `id:` return `Error::DuplicateNoteId` from `list` and `path_of`.
+  - [x] Malformed `id:` (non-ULID string or non-string value) returns `Error::InvalidFrontmatterId`.
+  - [x] Body bytes and checksums are preserved across backfill writes.
+  - [x] 10 integration tests in `crates/itala-vault/tests/identity_persistence.rs` pass.
+  - [x] `just ci` green.
+- **Files:**
+  - `crates/itala-vault/src/note/backfill.rs` (new)
+  - `crates/itala-vault/src/frontmatter.rs` (added `insert`, `emit`)
+  - `crates/itala-vault/src/note.rs` (added `id_from_frontmatter`)
+  - `crates/itala-vault/src/vault.rs` (rewrote `list`, `path_of`, `read`; added `resolve_id_for`)
+  - `crates/itala-vault/src/error.rs` (two new variants)
+  - `crates/itala-vault/tests/identity_persistence.rs` (new)
+- **Complexity:** Medium
+- **Depends on:** F4
+
 #### F5. `itala-vault` — local filesystem adapter
 - **Status:** Done (2026-05-27)
 - **Description:** Concrete `Vfs` implementation against the local filesystem. Implemented as `crates/itala-vault/src/adapters/local.rs` per `rules/rust/workspace.md` ("Concrete adapter (filesystem, S3, OpenAI) → that context's `adapters/` dir"). Path safety: all paths are vault-root-relative `Utf8Path`s; absolute paths and `..` traversal are rejected. File watcher via `notify` crate, debounced through `notify-debouncer-mini`, surfaced as a `Stream<Item = VfsEvent>`.
@@ -143,7 +164,7 @@ Pipeline (`.claude/rules/workflow.md`):
 - **Rules to load:** `rules/rust/async.md`, `rules/rust/ownership-and-lifetimes.md`, `rules/rust/security.md` (path validation).
 
 #### F6. `itala-cli` — smoke binary
-- **Status:** not-started
+- **Status:** Done (2026-05-28)
 - **Description:** Headless CLI that exercises kernel + vault end-to-end. Crate `crates/itala-cli` produces binary `itala` (set via `[[bin]] name = "itala"` per `rules/rust/workspace.md`). `clap` derive for argument parsing; `anyhow::Result` only at the `main()` edge. Commands: `vault open <path>`, `note list`, `note read <id>`, `note watch`. `tokio::main` lives here only.
 - **Acceptance criteria:**
   - [ ] `itala vault open ./fixtures/sample-vault` opens and prints "opened vault <id>".
@@ -216,6 +237,27 @@ Pipeline (`.claude/rules/workflow.md`):
 - **Complexity:** Low-Medium
 - **Depends on:** F4, F5
 
+#### F12. `NoteStore` seam + `FsNoteStore` refactor
+- **Status:** not-started
+- **Description:** Raise vault's abstraction from "bytes by path" to "notes by id." Introduce the `NoteStore` trait in `itala-vault` with `list`, `read`, `write`, `delete`, `query`, and `fs_location_of`. Refactor `Vault<Open>` to hold `Arc<dyn DynNoteStore>` and relocate today's vault.rs logic (path scanning, frontmatter split, id backfill, duplicate detection) verbatim into `FsNoteStore`. This is a behavior-preserving relocation — all existing tests must pass unchanged. Also adds `write`/`delete` as the first mutating vault API, with `FsNoteStore::write` doing atomic temp→rename via `LocalFsVfs`. Designed in `~/.claude/plans/as-a-product-owner-merry-pnueli.md`.
+- **Acceptance criteria:**
+  - [ ] `NoteStore` trait declared in `itala-vault` with a `DynNoteStore` shadow (async-trait + blanket impl), `Send` bound explicit.
+  - [ ] `NoteQuery` struct with tag-filter and title-substring fields; no speculative extras.
+  - [ ] `FsNoteStore` wraps `Arc<dyn DynVfs>` and passes all existing `vault_lifecycle.rs` and `identity_persistence.rs` tests unchanged.
+  - [ ] `Vault<Open>` holds `Arc<dyn DynNoteStore>` — `LocalFsVfs` and `MemoryVfs` still work as before (now under `FsNoteStore`).
+  - [ ] `write` round-trip test: write 10 notes → read each → frontmatter + body + checksum match.
+  - [ ] `delete` test: write note → delete → `read` returns `Error::NotFound`.
+  - [ ] `fs_location_of` returns `Some` from `FsNoteStore`; documented as `None` for DB backends.
+  - [ ] Compile-time `assert_send_sync` + `assert_unpin` for `FsNoteStore` and `Arc<dyn DynNoteStore>`.
+  - [ ] `just ci` green (no new `cargo deny` blocks expected; no new deps for the FS path).
+- **Files:**
+  - `crates/itala-vault/src/note_store.rs` (new — trait + `DynNoteStore` + `NoteQuery`)
+  - `crates/itala-vault/src/adapters/fs.rs` (new — `FsNoteStore`)
+  - `crates/itala-vault/src/vault.rs` (modify — swap `DynVfs` for `DynNoteStore`)
+  - `crates/itala-vault/src/lib.rs` (re-exports)
+- **Complexity:** Medium-High
+- **Depends on:** F6 (write surface exposed in CLI), F5.5
+
 ---
 
 ### Sprint 3 — Nice-to-Have (deferred — track but don't pull forward)
@@ -236,12 +278,35 @@ Pipeline (`.claude/rules/workflow.md`):
 - **Depends on:** F3, F5
 - **Note:** Out of strict Foundation scope; tracked so the threat model isn't forgotten when designing the VFS trait surface.
 
+#### F13. `PostgresNoteStore` (feature-gated)
+- **Status:** not-started
+- **Description:** Native Postgres implementation of `NoteStore`. Located at `crates/itala-vault/src/adapters/postgres.rs` behind an optional `postgres` feature (off by default). Uses `sqlx` with `runtime-tokio` + `tls-rustls` (never `native-tls`/`openssl-sys`), the `time` feature (not `chrono`), and connection string via `secrecy::SecretString` sourced from `DATABASE_URL`. Schema in a `sqlx` migration: `note` table with `id TEXT PK` (ULID), `title`, `tags TEXT[]`, `frontmatter JSONB`, `body BYTEA`, `checksum BYTEA`, `created_at`/`modified_at TIMESTAMPTZ`. GIN index on `tags`. `list` → `SELECT id FROM note`, `read` → typed row → `Note`, `write` → upsert, `delete` → `DELETE`, `query` → real SQL. `fs_location_of` → `Ok(None)`. Closes the `UNIX_EPOCH` timestamp gap. Designed in `~/.claude/plans/as-a-product-owner-merry-pnueli.md`.
+- **Acceptance criteria:**
+  - [ ] `PostgresNoteStore` implements `NoteStore` + `DynNoteStore`.
+  - [ ] `sqlx` configured with `runtime-tokio` + `tls-rustls`; `cargo deny check` passes after allowlist updates.
+  - [ ] Migration creates `note` table + `note_tags_idx` GIN index.
+  - [ ] Round-trip test (via `sqlx::test` + testcontainers): write 100 notes → `list` → `read` each → fields/checksums match.
+  - [ ] `query` returns correct sets for tag-filter and title-ILIKE cases.
+  - [ ] `created_at`/`modified_at` are real timestamps (not `UNIX_EPOCH`).
+  - [ ] `vault::Error` gains `#[from] sqlx::Error` variant (`Database`); `DuplicateNoteId` stays FS-scoped.
+  - [ ] Compile-time `assert_send_sync` for `PostgresNoteStore` and `Arc<dyn DynNoteStore>` covering the Postgres impl.
+  - [ ] Connection string (`DATABASE_URL`) sourced from env; never logged.
+  - [ ] `just ci` green; `cargo nextest run -p itala-vault --features postgres` passes against testcontainers Postgres.
+- **Files:**
+  - `crates/itala-vault/src/adapters/postgres.rs` (new — behind `#[cfg(feature = "postgres")]`)
+  - `crates/itala-vault/migrations/` (new — `sqlx` migration files)
+  - `crates/itala-vault/Cargo.toml` (optional `postgres` feature + sqlx dep)
+  - `crates/itala-vault/src/error.rs` (new `Database` variant)
+  - `deny.toml` (allowlist widening for sqlx/rustls tree)
+- **Complexity:** High
+- **Depends on:** F12
+
 ---
 
 ## Dependency graph
 
 ```
-F1 ─┬─► F2 ─┬─► F3 ─┬─► F4 ─┬─► F5 ──► F6
+F1 ─┬─► F2 ─┬─► F3 ─┬─► F4 ─┬─► F5 ──► F6 ──► F12 (S2) ──► F13 (S3)
     │       │       │       │
     │       │       │       └─► F7 (S2)
     │       │       │
@@ -253,6 +318,7 @@ F1 ─┬─► F2 ─┬─► F3 ─┬─► F4 ─┬─► F5 ──► F6
 ```
 
 Critical path: F1 → F2 → F3 → F4 → F5 → F6. Sprint 1 ships when F1–F6 are `completed`.
+Storage backend path: F6 → F12 (NoteStore seam) → F13 (Postgres).
 
 ---
 

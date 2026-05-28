@@ -1,10 +1,10 @@
 ---
-description: Drive implementation via RED → GREEN → REFACTOR. Invoke after a confirmed /plan; do not write code outside this cycle.
+description: Drive implementation via tests-first then implementation. Invoke after a confirmed /plan; do not write code outside this cycle.
 ---
 
 # TDD Command
 
-Gate 1 of the [Itala workflow](../rules/workflow.md): once `/plan` is confirmed, all implementation code is written inside `/tdd`. The skill enforces order — a failing test exists and is observed red **before** any production code is written.
+Gate 1 of the [Itala workflow](../rules/workflow.md): once `/plan` is confirmed, all implementation code is written inside `/tdd`. The agent writes tests and code; **you run every command**.
 
 ## Usage
 
@@ -12,49 +12,90 @@ Gate 1 of the [Itala workflow](../rules/workflow.md): once `/plan` is confirmed,
 /tdd [step-or-description]
 ```
 
-If `$ARGUMENTS` names a step from the active plan in `.claude/plans/<id>.md`, scope the cycle to that step. Otherwise, walk the plan's steps in order.
+If `$ARGUMENTS` names a step from the active plan in `.claude/plans/<id>.md`, scope the cycle to that step only. Otherwise, implement all steps in order.
 
-## Who does what
+## Mode selection
 
-The agent writes tests and code. **You run every command.** The agent never executes `cargo`, `just`, or any shell command — its only actions are writing files and outputting prompts for you to execute. Every execution step is a hard stop: the agent outputs the command, waits for your report, then continues.
+On every `/tdd` invocation, before writing any code, ask the user:
 
-## The cycle (per behavior)
+> **Which TDD mode?**
+>
+> **A — Batch** *(default)*: agent writes all tests, then all implementation in one pass; you run `just test` once at the end.
+>
+> **B — Per-spec**: agent writes one test at a time; you run after each write and report RED/GREEN before the next spec begins.
 
-1. **RED — agent writes the test.** Write a failing test against the public API of the step's target.
-   - Unit tests colocate (`#[cfg(test)] mod tests`); integration tests live in `tests/`; snapshots via `insta`; properties via `proptest`. See [`rules/rust/testing.md`](../rules/rust/testing.md).
-   - Name the test after the behavior (`parses_yaml_frontmatter`), not the function.
+Wait for the user to choose. Do not proceed until a mode is selected.
 
-2. **RED — you run.** The agent stops and outputs:
-   > Run `just test` (or narrow it: `cargo nextest run -p itala-<crate> <test_name>`) and report back. It should fail. If it passes unexpectedly, tell me — I'll fix the test before writing any implementation code.
+---
 
-3. **GREEN — agent writes the implementation.** After you confirm red, write the minimum code that turns the test green. No anticipated edge cases, no speculative branches.
+## Mode A — Batch
 
-4. **GREEN — you run.** The agent stops and outputs:
-   > Run `just test` (same scope as before) and report back. It should now pass.
+Agent writes everything for the full scope in one pass; you run two commands total.
 
-5. **REFACTOR — agent cleans up.** After you confirm green: extract helpers, tighten types, remove duplication. After each non-trivial change, the agent stops and outputs:
-   > Run `just test` again to confirm still green, then report back.
+### Who does what
 
-6. Repeat for the next behavior in the same step (edge cases, error variants, properties).
+The agent writes tests and code. **You run every command.** The agent never executes `cargo`, `just`, or any shell command — its only actions are writing files and outputting commands for you to run.
 
-## Hard rules
+### The cycle
 
-- **The agent never runs commands.** No `cargo`, `just`, or any shell invocation — ever. Output the command; wait for the user's report.
-- **No implementation before its test exists and the user reports it failing.** If the agent writes ahead of a confirmed-red test, delete the code, write the test, wait for red confirmation.
-- **Never edit a test to fit existing code.** If the code is right and the test is wrong, the test was lying — replace it.
-- **Never advance a step until the user reports `just test` green.** "It should work" is not a user-reported green.
-- **No `unwrap()` / `expect("")` outside tests** (see [`rules/rust/error-handling.md`](../rules/rust/error-handling.md)).
+1. **Write all tests.** For every plan step in scope, write tests covering the behavior, error variants, and edge cases against the public API.
+   - Unit tests colocate (`#[cfg(test)] mod tests`); integration tests in `tests/`; snapshots via `insta`; properties via `proptest`. See [`rules/rust/testing.md`](../rules/rust/testing.md).
+   - Name tests after the behavior (`parses_yaml_frontmatter`), not the function.
+
+2. **Write all implementation.** After all tests are written, implement every plan step — minimum code that makes the tests pass. No speculative branches or anticipated edge cases beyond what the tests require.
+
+3. **Refactor.** Clean up inline — extract helpers, tighten types, remove duplication. No confirmation needed.
+
+4. **You run once.**
+   > Run `just test` (or narrow: `cargo nextest run -p itala-<crate>`) and report back.
+
+5. **Fix if red.** On failure, analyze all failures, fix everything identifiable in one pass, then ask for another run. Repeat until green.
+
+6. **CI gate.** Once `just test` is green:
+   > Run `just ci` — the full gate (`fmt` → `clippy` → `nextest` → `deny` → `doc`) — and report back. Only after a passing `just ci` may you call `/sprint-update <F#> completed`.
+
+---
+
+## Mode B — Per-spec
+
+One RED-GREEN-REFACTOR loop per spec. You run after every write and report the result before the agent continues.
+
+### Who does what
+
+Same as Batch: the agent writes files and outputs commands; **you run every command and report back**.
+
+### The cycle (repeat for each spec)
+
+1. **Agent writes one test** for the next spec — covers the behavior, one error variant, or one edge case. Outputs:
+   > Run `just test` (or `cargo nextest run -p itala-<crate>`) and report back.
+
+2. **You run and report RED.** The agent does not write implementation until you confirm the test fails. If you report green without implementation, the agent stops and diagnoses why (stale snapshot, wrong test target, etc.).
+
+3. **Agent writes minimum implementation** — only enough to make that one test pass.
+   > Run `just test` and report back.
+
+4. **You run and report GREEN.** The agent does not move to the next spec until you confirm passing.
+
+5. **Agent refactors** if warranted (inline — no new functionality). Then loops back to step 1 for the next spec.
+
+6. **CI gate.** After all specs are green:
+   > Run `just ci` — the full gate (`fmt` → `clippy` → `nextest` → `deny` → `doc`) — and report back. Only after a passing `just ci` may you call `/sprint-update <F#> completed`.
+
+---
+
+## Hard rules (both modes)
+
+- **The agent never runs commands.** No `cargo`, `just`, or any shell invocation.
+- **Tests are written before implementation** — always, in both modes.
+- **Never edit a test to fit existing code.** If a test is wrong, replace it with a correct one.
+- **No `unwrap()` / `expect("")` outside tests** — see [`rules/rust/error-handling.md`](../rules/rust/error-handling.md).
+- **Mode B only:** never advance from RED to GREEN without a user-reported failing test; never advance past GREEN without a user-reported passing test.
 
 ## Exit criteria
 
-- Every plan step is implemented behind a passing test.
-- The user has reported `just test` green across the workspace (not just the focused crate).
-- `.claude/plans/<id>.md` status is at `in-progress` (flip via `/sprint-update` if not).
-
-## After exiting
-
-When all steps are complete and you have reported `just test` green, the agent outputs:
-> Run `just ci` — the full gate (`fmt` → `clippy` → `nextest` → `deny` → `doc`) — and report back. Only after you report a passing `just ci` may you call `/sprint-update <F#> completed`. Local green is not the same as a green CI gate.
+- Every plan step is implemented behind passing tests.
+- You have reported `just test` green across the workspace.
+- You have reported `just ci` passing before `/sprint-update <F#> completed` is called.
 
 ## Pipeline position
 

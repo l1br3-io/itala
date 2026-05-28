@@ -36,6 +36,23 @@ impl MemoryVfs {
             .unwrap()
             .insert(path.into(), Bytes::copy_from_slice(bytes));
     }
+
+    /// Return a copy of the bytes stored at `path`, or `None` if not present.
+    ///
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
+    #[must_use]
+    pub fn get(&self, path: impl Into<Utf8PathBuf>) -> Option<Bytes> {
+        self.files.lock().unwrap().get(&path.into()).cloned()
+    }
+
+    /// Remove the file at `path` (no-op if not present).
+    ///
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
+    pub fn remove(&self, path: impl Into<Utf8PathBuf>) {
+        self.files.lock().unwrap().remove(&path.into());
+    }
 }
 
 impl Vfs for MemoryVfs {

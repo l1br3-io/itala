@@ -20,15 +20,9 @@ async fn run() -> anyhow::Result<()> {
             cli::VaultCmd::Open { path } => commands::vault::open(path).await,
         },
         cli::Command::Note { cmd } => match cmd {
-            cli::NoteCmd::List { vault } => {
-                unimplemented!("note list {vault}")
-            }
-            cli::NoteCmd::Read { vault, id } => {
-                unimplemented!("note read {id} from {vault}")
-            }
-            cli::NoteCmd::Watch { vault } => {
-                unimplemented!("note watch {vault}")
-            }
+            cli::NoteCmd::List { vault } => commands::note::list(vault).await,
+            cli::NoteCmd::Read { vault, id } => commands::note::read(vault, id).await,
+            cli::NoteCmd::Watch { vault } => commands::note::watch(vault).await,
         },
     }
 }

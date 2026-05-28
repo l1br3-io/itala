@@ -1,0 +1,2 @@
+# Prevent git from normalizing the CRLF fixture used to test body preservation.
+crates/itala-cli/tests/fixtures/sample-vault/05-crlf.md binary

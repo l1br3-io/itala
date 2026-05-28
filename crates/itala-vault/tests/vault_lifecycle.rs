@@ -39,38 +39,54 @@ async fn read_returns_correct_note() {
     let vault = build_vault().await;
     let ids = vault.list().await.unwrap();
 
-    // Find the note whose path is "alpha.md" by reading them all.
-    let mut alpha = None;
+    // Find the note whose fs_location is "alpha.md" by reading them all.
+    let mut alpha_entry = None;
     for id in &ids {
         let note = vault.read(*id).await.unwrap();
-        if note.path.as_str() == "alpha.md" {
-            alpha = Some(note);
+        if note.fs_location().unwrap().as_str() == "alpha.md" {
+            alpha_entry = Some((*id, note));
             break;
         }
     }
-    let alpha = alpha.expect("alpha.md should be in the list");
+    let (alpha_id, alpha) = alpha_entry.expect("alpha.md should be in the list");
     assert_eq!(
         alpha.frontmatter.get("title").unwrap(),
         &serde_json::json!("Alpha")
     );
     assert_eq!(&alpha.body[..], b"Alpha body.\n");
-    // Checksum must be stable across two reads.
-    let c2 = blake3::hash(NOTE_A);
-    assert_eq!(alpha.checksum, c2);
+    // After backfill, the on-disk content differs from NOTE_A (id: field added),
+    // so we verify stability: two reads return the same checksum.
+    let alpha2 = vault.read(alpha_id).await.unwrap();
+    assert_eq!(alpha.checksum, alpha2.checksum, "checksum must be stable");
 }
 
 #[tokio::test]
-async fn path_of_returns_correct_path() {
+async fn fs_location_of_returns_correct_path() {
     let vault = build_vault().await;
     let ids = vault.list().await.unwrap();
 
     for id in ids {
-        let path = vault.path_of(id).await.unwrap();
+        let path = vault
+            .fs_location_of(id)
+            .await
+            .unwrap()
+            .expect("FS backend always returns Some");
         assert!(
             path.extension() == Some("md"),
-            "path_of should return an .md path"
+            "fs_location_of should return an .md path"
         );
     }
+}
+
+#[tokio::test]
+async fn fs_location_of_returns_none_for_unknown_id() {
+    let vault = build_vault().await;
+    let unknown = itala_kernel::NoteId::new();
+    let result = vault.fs_location_of(unknown).await.unwrap();
+    assert!(
+        result.is_none(),
+        "unknown id should return Ok(None), not an error"
+    );
 }
 
 #[tokio::test]
