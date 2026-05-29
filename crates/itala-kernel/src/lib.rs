@@ -14,6 +14,10 @@
 //!   [`CapabilityGranter`] trait for authorized minting.
 //! - **VFS** — [`Vfs`] (static dispatch) and [`DynVfs`] (object-safe) abstract
 //!   over storage backends; [`VfsEvent`] carries raw change notifications.
+//! - **Storage provider** — [`StorageProvider`] (static dispatch) and
+//!   [`DynStorageProvider`] (object-safe) define the single swappable
+//!   persistence seam; [`Record`], [`Filter`], [`WriteOp`], and
+//!   [`ProviderCapabilities`] describe the contract.
 //! - **Event bus** — [`EventBus`] is a generic broadcast primitive over any
 //!   `Clone + Send + 'static` payload. [`KernelEventBus`] aliases it for the
 //!   kernel's own [`KernelEvent`] enum.
@@ -25,6 +29,7 @@ mod capability;
 mod error;
 pub mod events;
 mod id;
+pub mod storage;
 pub mod vfs;
 
 pub use tokio_util::sync::CancellationToken;
@@ -33,6 +38,10 @@ pub use capability::{Capability, CapabilityGranter, CapabilityName};
 pub use error::{Error, Result};
 pub use events::{EventBus, KernelEvent, KernelEventBus};
 pub use id::{BlockId, IdKind, Identity, LinkId, NoteId, PluginId, VaultId};
+pub use storage::{
+    Condition, DynStorageProvider, Filter, MatchOp, ProviderCapabilities, Record,
+    StorageProvider, WriteOp,
+};
 pub use vfs::{DynVfs, Vfs, VfsEvent};
 
 #[cfg(test)]

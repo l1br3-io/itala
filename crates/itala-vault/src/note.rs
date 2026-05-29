@@ -23,11 +23,11 @@ pub struct Note {
     /// derived from the vault-root-relative path and backfilled on first read
     /// for notes that pre-date this field.
     pub id: NoteId,
-    /// Vault-root-relative path to the Markdown file.
+    /// Vault-root-relative path to the Markdown file, if the backend is FS-shaped.
     ///
-    /// Private: callers use [`Note::fs_location`] so the `Option` return signals
-    /// that this field has no meaning on non-FS backends.
-    pub(crate) path: Utf8PathBuf,
+    /// `None` for non-FS backends (encrypted-blob, remote, database) where a
+    /// filesystem path is not meaningful.  Callers use [`Note::fs_location`].
+    pub(crate) path: Option<Utf8PathBuf>,
     /// Parsed YAML frontmatter (empty when none is present).
     pub frontmatter: Frontmatter,
     /// Raw note body — everything after the closing frontmatter fence, as-is.
@@ -54,7 +54,7 @@ impl Note {
     /// database) where a filesystem location is not meaningful.
     #[must_use]
     pub fn fs_location(&self) -> Option<&Utf8Path> {
-        Some(&self.path)
+        self.path.as_deref()
     }
 }
 
@@ -121,7 +121,7 @@ pub fn assemble(
     let body = Bytes::copy_from_slice(body_slice);
     Ok(Note {
         id,
-        path,
+        path: Some(path),
         frontmatter: fm,
         body,
         checksum,
@@ -274,6 +274,23 @@ mod tests {
         .unwrap();
         let loc = note.fs_location().expect("FS-backed note has a location");
         assert_eq!(loc, Utf8Path::new("notes/test.md"));
+    }
+
+    #[test]
+    fn fs_location_returns_none_when_path_is_none() {
+        // Simulate a non-FS backend: path field is None.
+        let raw = Bytes::from_static(b"---\ntitle: hi\n---\nbody\n");
+        let (fm, body_slice) = crate::frontmatter::split(&raw).unwrap();
+        let note = Note {
+            id: NoteId::new(),
+            path: None,
+            frontmatter: fm,
+            body: Bytes::copy_from_slice(body_slice),
+            checksum: blake3::hash(&raw),
+            created_at: OffsetDateTime::UNIX_EPOCH,
+            modified_at: OffsetDateTime::UNIX_EPOCH,
+        };
+        assert!(note.fs_location().is_none(), "non-FS note must return None");
     }
 
     proptest! {

@@ -70,6 +70,29 @@ pub enum Error {
     /// An I/O error from the underlying operating system.
     #[error("io")]
     Io(#[from] std::io::Error),
+
+    /// An error originating in a storage-provider backend.
+    ///
+    /// The payload carries the original provider error without requiring
+    /// `itala-kernel` to know any backend types.  Construct explicitly —
+    /// no `#[from]` because `std::io::Error` already satisfies
+    /// `Error + Send + Sync` and the `Io` variant already owns `#[from]`
+    /// for it; a second `#[from]` would be a coherence/ambiguity error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use itala_kernel::Error;
+    ///
+    /// let io_err = std::io::Error::other("disk full");
+    /// let e = Error::Provider(Box::new(io_err));
+    /// assert!(e.to_string().starts_with("provider:"));
+    /// ```
+    #[error("provider: {0}")]
+    Provider(
+        /// The upstream provider error.
+        Box<dyn std::error::Error + Send + Sync>,
+    ),
 }
 
 /// Kernel result alias.
@@ -125,5 +148,17 @@ mod tests {
         let io_err = std::io::Error::other("disk full");
         let e: Error = io_err.into();
         assert!(matches!(e, Error::Io(_)));
+    }
+
+    #[test]
+    fn provider_display() {
+        let io_err = std::io::Error::other("backend unavailable");
+        let e = Error::Provider(Box::new(io_err));
+        let msg = e.to_string();
+        assert!(!msg.is_empty(), "Display must be non-empty");
+        assert!(
+            msg.contains("provider"),
+            "Display must contain 'provider', got: {msg}"
+        );
     }
 }
