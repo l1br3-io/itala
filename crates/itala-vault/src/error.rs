@@ -47,7 +47,7 @@ pub enum Error {
 
     /// A kernel-level error bubbled up.
     #[error(transparent)]
-    Kernel(#[from] itala_kernel::Error),
+    Kernel(itala_kernel::Error),
 
     /// An I/O error from the underlying operating system.
     #[error("io")]
@@ -77,6 +77,18 @@ pub enum Error {
 
 /// Convenience alias for `Result<T, vault::Error>`.
 pub type Result<T> = core::result::Result<T, Error>;
+
+impl From<itala_kernel::Error> for Error {
+    fn from(e: itala_kernel::Error) -> Self {
+        match e {
+            itala_kernel::Error::Provider(b) => match b.downcast::<Self>() {
+                Ok(boxed) => *boxed,
+                Err(b) => Self::Kernel(itala_kernel::Error::Provider(b)),
+            },
+            other => Self::Kernel(other),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -178,9 +190,47 @@ mod tests {
     }
 
     #[test]
-    fn kernel_from() {
+    fn kernel_from_plain_io_wraps_as_kernel() {
         let k = itala_kernel::Error::Io(std::io::Error::other("x"));
         let e: Error = k.into();
         assert!(matches!(e, Error::Kernel(_)));
+    }
+
+    #[test]
+    fn provider_boxed_duplicate_note_id_round_trips() {
+        let id = itala_kernel::NoteId::new();
+        let inner = Error::DuplicateNoteId {
+            id,
+            first_fs_location: camino::Utf8PathBuf::from("a.md"),
+            second_fs_location: camino::Utf8PathBuf::from("b.md"),
+        };
+        let k = itala_kernel::Error::Provider(Box::new(inner));
+        let e: Error = k.into();
+        assert!(
+            matches!(e, Error::DuplicateNoteId { .. }),
+            "Provider-boxed vault::Error must downcast to its original variant"
+        );
+    }
+
+    #[test]
+    fn provider_boxed_invalid_frontmatter_id_round_trips() {
+        let inner = Error::InvalidFrontmatterId {
+            value: "bad".to_owned(),
+        };
+        let k = itala_kernel::Error::Provider(Box::new(inner));
+        let e: Error = k.into();
+        assert!(matches!(e, Error::InvalidFrontmatterId { .. }));
+    }
+
+    #[test]
+    fn provider_boxed_foreign_error_stays_kernel() {
+        let io_err = std::io::Error::other("foreign");
+        let k = itala_kernel::Error::Provider(Box::new(io_err));
+        let e: Error = k.into();
+        // Foreign error (not a vault::Error) is preserved as Kernel(Provider(...))
+        assert!(
+            matches!(e, Error::Kernel(itala_kernel::Error::Provider(_))),
+            "non-vault Provider error must stay as Kernel(Provider(...))"
+        );
     }
 }

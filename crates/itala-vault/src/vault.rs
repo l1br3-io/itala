@@ -1,20 +1,20 @@
-//! Type-state vault: open/close, listing, and reading notes.
+//! Type-state vault: open/close, listing, reading, writing, and deleting notes.
 
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8PathBuf;
 use itala_kernel::{DynVfs, NoteId};
-use time::OffsetDateTime;
 
+use crate::adapters::FileProvider;
 use crate::error::{Error, Result};
-use crate::note::{self, Note};
-use crate::{frontmatter, note::backfill};
+use crate::note::Note;
+use crate::note_store::{NoteQuery, NoteStore};
 
 /// Marker for a vault that has not been opened yet.
 pub struct Closed;
 
-/// Marker for a vault that is open and ready for reads.
+/// Marker for a vault that is open and ready for reads and writes.
 pub struct Open;
 
 /// A vault over an injected [`DynVfs`] backend.
@@ -24,6 +24,8 @@ pub struct Open;
 pub struct Vault<State> {
     vfs: Arc<dyn DynVfs>,
     root: Utf8PathBuf,
+    // None when State = Closed; Some when State = Open.
+    store: Option<NoteStore>,
     _state: PhantomData<State>,
 }
 
@@ -34,11 +36,14 @@ impl Vault<Closed> {
         Self {
             vfs,
             root: root.into(),
+            store: None,
             _state: PhantomData,
         }
     }
 
     /// Open the vault, confirming the root exists on the VFS.
+    ///
+    /// Builds the [`FileProvider`] → `NoteStore` chain internally.
     ///
     /// # Errors
     /// Returns [`Error::BadRoot`] if the root does not exist.
@@ -47,9 +52,12 @@ impl Vault<Closed> {
         if !exists {
             return Err(Error::BadRoot { path: self.root });
         }
+        let provider = FileProvider::new(Arc::clone(&self.vfs), self.root.clone());
+        let store = NoteStore::new(Arc::new(provider));
         Ok(Vault {
             vfs: self.vfs,
             root: self.root,
+            store: Some(store),
             _state: PhantomData,
         })
     }
@@ -58,164 +66,91 @@ impl Vault<Closed> {
 impl Vault<Open> {
     /// List all note IDs in the vault, sorted for determinism.
     ///
-    /// Recursively walks the vault root via the VFS and collects every `*.md`
-    /// file.  Each file is read and its `id:` frontmatter field resolved;
-    /// notes without `id:` are backfilled in place.  This is O(N) VFS reads.
+    /// Recursively walks the vault root and collects every `*.md` file.
+    /// Notes without `id:` are backfilled in place.
     ///
     /// # Errors
     /// - [`Error::DuplicateNoteId`] if two notes share the same `id:`.
     /// - [`Error::InvalidFrontmatterId`] if any note has a malformed `id:`.
     /// - Propagates other VFS and parse errors.
     pub async fn list(&self) -> Result<Vec<NoteId>> {
-        let paths = collect_md_paths(&self.vfs, &self.root).await?;
-        let mut seen: Vec<(NoteId, Utf8PathBuf)> = Vec::new();
-        for path in paths {
-            let id = self.resolve_id_for(&path).await?;
-            if let Some((_, first_path)) = seen.iter().find(|(eid, _)| *eid == id) {
-                return Err(Error::DuplicateNoteId {
-                    id,
-                    first_fs_location: first_path.clone(),
-                    second_fs_location: path,
-                });
-            }
-            seen.push((id, path));
-        }
-        let mut ids: Vec<NoteId> = seen.into_iter().map(|(id, _)| id).collect();
-        ids.sort();
-        Ok(ids)
+        self.store().list().await
     }
 
     /// Read a note by ID.
     ///
-    /// Locates the note's path via [`Self::fs_location_of`], then reads and assembles the
-    /// note.  If the file did not yet contain an `id:` field, the backfill
-    /// write already happened inside `fs_location_of`; the bytes read here are the
-    /// post-backfill content.
-    ///
     /// # Errors
-    /// Returns [`Error::NotFound`] if no note has that id.  Propagates VFS,
+    /// Returns [`Error::NotFound`] if no note has that id. Propagates VFS,
     /// parse, and identity errors otherwise.
     pub async fn read(&self, id: NoteId) -> Result<Note> {
-        let path = self
-            .fs_location_of(id)
-            .await?
-            .ok_or(Error::NotFound { id })?;
-        let abs = self.root.join(&path);
-        let raw = self.vfs.read(&abs).await.map_err(Error::from)?;
-        let (fm, body) = frontmatter::split(&raw)?;
-        // After path_of the file is guaranteed to have `id:` in it, but we
-        // re-resolve defensively and handle the absent case for robustness.
-        let resolved_id = if let Some(fid) = note::id_from_frontmatter(&fm)? {
-            fid
-        } else {
-            let path_id = note::id_from_path(&path);
-            let rewritten = backfill::inject_id(&raw, &fm, body, path_id);
-            self.vfs.write(&abs, rewritten).await.map_err(Error::from)?;
-            path_id
-        };
-        note::assemble(
-            path,
-            resolved_id,
-            &raw,
-            OffsetDateTime::UNIX_EPOCH,
-            OffsetDateTime::UNIX_EPOCH,
-        )
+        self.store().read(id).await
     }
 
-    /// Return the vault-root-relative filesystem path for the given ID, if this
-    /// is an FS-shaped backend.
+    /// Write (create or overwrite) a note.
     ///
-    /// Returns `Ok(Some(path))` when the note is found, `Ok(None)` when no note
-    /// with that ID exists in the vault.  The `Option` signals that this method
-    /// is only meaningful for FS-backed vaults; future non-FS backends return
-    /// `Ok(None)` for all IDs they manage through other means.
+    /// The note's `id` and frontmatter are serialised into the on-disk blob.
     ///
-    /// Scans the full vault, resolving each note's ID (and backfilling when
-    /// absent).  Detects duplicate `id:` values and errors immediately.
+    /// # Errors
+    /// Propagates VFS errors.
+    pub async fn write(&self, note: &Note) -> Result<()> {
+        self.store().write(note).await
+    }
+
+    /// Delete a note by ID.
+    ///
+    /// Succeeds silently if no note with that ID exists.
+    ///
+    /// # Errors
+    /// Propagates VFS errors.
+    pub async fn delete(&self, id: NoteId) -> Result<()> {
+        self.store().delete(id).await
+    }
+
+    /// Return the vault-root-relative filesystem path for the given ID, if
+    /// this is an FS-shaped backend.
+    ///
+    /// Returns `Ok(Some(path))` when found, `Ok(None)` when the id does not
+    /// exist (or the backend is non-FS).
     ///
     /// # Errors
     /// - [`Error::DuplicateNoteId`] if two notes share the same id.
     /// - [`Error::InvalidFrontmatterId`] if any scanned note has a malformed `id:`.
     pub async fn fs_location_of(&self, id: NoteId) -> Result<Option<Utf8PathBuf>> {
-        let paths = collect_md_paths(&self.vfs, &self.root).await?;
-        let mut found: Option<Utf8PathBuf> = None;
-        for path in paths {
-            let note_id = self.resolve_id_for(&path).await?;
-            if note_id == id {
-                if let Some(first) = found {
-                    return Err(Error::DuplicateNoteId {
-                        id,
-                        first_fs_location: first,
-                        second_fs_location: path,
-                    });
-                }
-                found = Some(path);
-            }
-        }
-        Ok(found)
+        self.store().fs_location_of(id).await
+    }
+
+    /// Query notes whose indexed fields match the given [`NoteQuery`].
+    ///
+    /// Uses a host-side scan-and-filter for [`FileProvider`]-backed vaults.
+    ///
+    /// # Errors
+    /// Propagates provider and parse errors.
+    pub async fn query(&self, q: &NoteQuery) -> Result<Vec<Note>> {
+        self.store().query(q).await
     }
 
     /// Close the vault, returning it to the `Closed` state.
-    ///
-    /// Sync in F4 (no buffered writes to flush). Will become `async` when writes land.
     #[must_use]
     pub fn close(self) -> Vault<Closed> {
         Vault {
             vfs: self.vfs,
             root: self.root,
+            store: None,
             _state: PhantomData,
         }
     }
 
-    /// Resolve the [`NoteId`] for a vault-root-relative path.
+    /// Access the inner `NoteStore`.
     ///
-    /// Reads the file, parses its frontmatter, and returns the `id:` field if
-    /// present.  When absent, derives the id from the path (the legacy scheme)
-    /// and immediately backfills the `id:` field into the file so subsequent
-    /// reads use the stable frontmatter id.
-    ///
-    /// Callers must pass a relative path; the vault root is prepended internally.
-    ///
-    /// # Errors
-    /// - [`Error::InvalidFrontmatterId`] if `id:` is present but malformed.
-    /// - Propagates VFS and parse errors.
-    async fn resolve_id_for(&self, rel_path: &Utf8Path) -> Result<NoteId> {
-        let abs = self.root.join(rel_path);
-        let raw = self.vfs.read(&abs).await.map_err(Error::from)?;
-        let (fm, body) = frontmatter::split(&raw)?;
-        if let Some(id) = note::id_from_frontmatter(&fm)? {
-            Ok(id)
-        } else {
-            let id = note::id_from_path(rel_path);
-            let rewritten = backfill::inject_id(&raw, &fm, body, id);
-            self.vfs.write(&abs, rewritten).await.map_err(Error::from)?;
-            Ok(id)
+    /// # Panics
+    /// Panics if called on a `Vault<Open>` whose store was not initialised
+    /// (this is an invariant violation that cannot happen through the public API).
+    const fn store(&self) -> &NoteStore {
+        match self.store.as_ref() {
+            Some(s) => s,
+            None => panic!("invariant: Vault<Open> always has a NoteStore"),
         }
     }
-}
-
-/// Recursively collect vault-root-relative `Utf8PathBuf` entries for every
-/// `*.md` file under `root`. `DynVfs::list` is shallow (direct children only),
-/// so we recurse into children that have no extension (heuristic for directories).
-async fn collect_md_paths(vfs: &Arc<dyn DynVfs>, root: &Utf8Path) -> Result<Vec<Utf8PathBuf>> {
-    let mut out = Vec::new();
-    let mut stack = vec![root.to_owned()];
-    while let Some(dir) = stack.pop() {
-        let children = vfs.list(&dir).await.map_err(Error::from)?;
-        for child in children {
-            // `child` is an absolute path. Derive the vault-root-relative form.
-            let rel = child.strip_prefix(root).unwrap_or(&child).to_owned();
-            if child.extension() == Some("md") {
-                out.push(rel);
-            } else if child.extension().is_none() {
-                // No extension → likely a subdirectory; recurse.
-                stack.push(child);
-            }
-            // Files with other extensions are skipped.
-        }
-    }
-    tracing::debug!(count = out.len(), root = %root, "vault listed notes");
-    Ok(out)
 }
 
 // ---------------------------------------------------------------------------

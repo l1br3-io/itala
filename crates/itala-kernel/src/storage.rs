@@ -132,7 +132,7 @@ pub enum WriteOp {
 /// Storage-provider port — static-dispatch variant.
 ///
 /// Implement this trait for any storage backend (local files, Postgres,
-/// SQLite, …). `Send + Sync` is required so implementations can be shared
+/// `SQLite`, …). `Send + Sync` is required so implementations can be shared
 /// across async tasks.
 ///
 /// Use [`DynStorageProvider`] when you need to store the implementation behind
@@ -159,11 +159,8 @@ pub trait StorageProvider: Send + Sync {
     ///
     /// # Errors
     /// Returns [`crate::Error::Provider`] if the backend fails.
-    fn put(
-        &self,
-        collection: &str,
-        record: Record,
-    ) -> impl Future<Output = Result<()>> + Send + '_;
+    fn put(&self, collection: &str, record: Record)
+    -> impl Future<Output = Result<()>> + Send + '_;
 
     /// Delete a record by collection and key.
     ///
@@ -171,11 +168,7 @@ pub trait StorageProvider: Send + Sync {
     ///
     /// # Errors
     /// Returns [`crate::Error::Provider`] if the backend fails.
-    fn delete(
-        &self,
-        collection: &str,
-        key: &str,
-    ) -> impl Future<Output = Result<()>> + Send + '_;
+    fn delete(&self, collection: &str, key: &str) -> impl Future<Output = Result<()>> + Send + '_;
 
     /// List all keys in a collection.
     ///
@@ -222,10 +215,7 @@ pub trait StorageProvider: Send + Sync {
     /// # Errors
     /// Returns [`crate::Error::Provider`] when unsupported or when the backend
     /// fails.
-    fn transaction(
-        &self,
-        _ops: Vec<WriteOp>,
-    ) -> impl Future<Output = Result<()>> + Send + '_ {
+    fn transaction(&self, _ops: Vec<WriteOp>) -> impl Future<Output = Result<()>> + Send + '_ {
         std::future::ready(Err(provider_unsupported("transaction")))
     }
 }
@@ -406,10 +396,7 @@ mod tests {
             }
         }
 
-        fn list(
-            &self,
-            collection: &str,
-        ) -> impl Future<Output = Result<Vec<String>>> + Send + '_ {
+        fn list(&self, collection: &str) -> impl Future<Output = Result<Vec<String>>> + Send + '_ {
             let records = Arc::clone(&self.records);
             let col = collection.to_owned();
             async move {
@@ -540,9 +527,7 @@ mod tests {
     #[tokio::test]
     async fn query_returns_unsupported_by_default() {
         let provider: Arc<dyn DynStorageProvider> = Arc::new(MemoryStorageProvider::default());
-        let filter = Filter {
-            conditions: vec![],
-        };
+        let filter = Filter { conditions: vec![] };
         let err = provider.query("notes", &filter).await.unwrap_err();
         assert!(
             matches!(err, crate::Error::Provider(_)),

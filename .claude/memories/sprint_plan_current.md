@@ -238,7 +238,7 @@ Pipeline (`.claude/rules/workflow.md`):
 - **Depends on:** F4, F5
 
 #### F12. `StorageProvider` seam + `FileProvider` + `NoteStore`-over-provider
-- **Status:** not-started
+- **Status:** Done (2026-05-29)
 - **Description:** Introduce the single **swappable storage seam** that the whole app will persist through. The product goal: a user picks one backend and notes, config, history, and plugin-state all flow through it; a backend author implements **one** adapter (e.g. MySQL) and everything works. Three layers:
   1. **Provider seam** — `StorageProvider` trait in `itala-kernel` (domain-agnostic "collections of records"), sitting alongside `Vfs`. CORE methods every backend implements: `get`/`put`/`delete`/`list` over `(collection, key)` + `capabilities()`. OPTIONAL methods guarded by `ProviderCapabilities` (host falls back when absent): `query(collection, &Filter)` and `transaction(Vec<WriteOp>)`. `Record { key: String, indexed: BTreeMap<String, FrontmatterValue>, blob: Bytes }` — `indexed` holds queryable fields a backend may index; `blob` is the opaque payload. Object-safe `DynStorageProvider` shadow (async-trait + blanket impl) mirroring `Vfs`/`DynVfs`, `Send` bound explicit. **Capability negotiation** is what keeps the contract tiny (anyone can write an adapter) while still allowing native DB queries (smart backends advertise `native_query`/`transactions`; the host uses the fast path).
   2. **`FileProvider`** (in `itala-vault` adapters, over `Arc<dyn DynVfs>`; `native_query=false` → host-side scan+filter). Relocates today's `vault.rs` note logic (`collect_md_paths`, `resolve_id_for`, frontmatter split, `id:` backfill, duplicate detection) **verbatim** — the regression contract.

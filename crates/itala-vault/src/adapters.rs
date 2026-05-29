@@ -1,7 +1,11 @@
 //! Storage backend adapters.
 //!
-//! Currently ships one adapter: [`LocalFsVfs`] for the local OS filesystem.
+//! Ships two adapters:
+//! - [`LocalFsVfs`] — local OS filesystem [`itala_kernel::Vfs`] implementation.
+//! - [`FileProvider`] — FS-backed [`itala_kernel::StorageProvider`] over any [`itala_kernel::DynVfs`].
 
+pub mod file;
 mod local;
 
+pub use file::FileProvider;
 pub use local::LocalFsVfs;

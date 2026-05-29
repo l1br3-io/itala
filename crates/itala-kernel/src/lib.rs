@@ -39,8 +39,8 @@ pub use error::{Error, Result};
 pub use events::{EventBus, KernelEvent, KernelEventBus};
 pub use id::{BlockId, IdKind, Identity, LinkId, NoteId, PluginId, VaultId};
 pub use storage::{
-    Condition, DynStorageProvider, Filter, MatchOp, ProviderCapabilities, Record,
-    StorageProvider, WriteOp,
+    Condition, DynStorageProvider, Filter, MatchOp, ProviderCapabilities, Record, StorageProvider,
+    WriteOp,
 };
 pub use vfs::{DynVfs, Vfs, VfsEvent};
 
