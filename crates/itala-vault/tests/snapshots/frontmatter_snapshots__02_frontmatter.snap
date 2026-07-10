@@ -1,5 +1,0 @@
----
-source: crates/itala-vault/tests/frontmatter_snapshots.rs
-expression: fm.as_map()
----
-title: hello
