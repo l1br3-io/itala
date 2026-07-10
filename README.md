@@ -15,7 +15,6 @@ Itala is a cross-platform, extensible knowledge management system for notes, lin
 ## Learn more
 
 - **[docs/VISION.md](docs/VISION.md)** — Design orientation and core principles.
-- **[docs/PRODUCT.md](docs/PRODUCT.md)** — Who Itala is for and the jobs they want to accomplish.
 - **[docs/ROADMAP.md](docs/ROADMAP.md)** — MVP scope, phased delivery, and future vision.
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — How Itala works under the hood: kernel, plugin system, data model, security, accessibility.
 
@@ -32,5 +31,3 @@ just test     # nextest + doctests
 just deny     # license and supply-chain check
 just doc      # build docs (broken-link check)
 ```
-
-Install the toolchain (pinned in `rust-toolchain.toml`) with `rustup`, then `cargo install just` and `cargo install cargo-nextest cargo-deny` to get started.
