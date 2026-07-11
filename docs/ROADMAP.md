@@ -35,7 +35,7 @@ The launch scope is **locked to the knowledge management core**: vaults, editing
 
 ## Themes
 
-Five strategic directions make up the launch:
+Six strategic directions: five make up the **launch core**, and **Studio** extends the product as a post-launch direction.
 
 | Theme | What it means |
 |-------|---------------|
@@ -44,6 +44,7 @@ Five strategic directions make up the launch:
 | **Connect** | A knowledge graph that links your notes bidirectionally — backlinks, mentions |
 | **Find** | Full-text search and quick-open discovery across your entire vault |
 | **Extend** | A plugin ecosystem where the community builds the rest — curated repo, hub |
+| **Studio** *(post-launch)* | A workspace where any note-acting plugin becomes a tool — compose, transform, automate |
 
 ---
 
@@ -60,8 +61,8 @@ Six milestones, each shipping a demoable increment built on the last. The produc
 | M4 | **Find** | Full-text search across every note; filters by tag, folder, frontmatter, date; quick-open palette with fuzzy matching |
 | M5 | **Extend** | Install plugins from a curated repository — editors, themes, storage backends, sync, search engines, AI providers, exporters, commands, renderers |
 
-### M0 — Foundation
-The kernel and plugin host run. The kernel provides shared types, an event bus, a virtual file system abstraction, a configuration registry, and the capability system that mediates all plugin interactions. Plugins are sandboxed modules with declared capabilities; a failing plugin does not crash the host. Data persists durably so nothing is lost across restarts. This milestone has no user-facing surface — it is the bedrock everything else stands on, verified entirely through tests.
+### M0 — Foundation ✅
+The kernel and plugin host run. The kernel provides shared types, an event bus, a virtual file system abstraction, a configuration registry, and the capability system that mediates all plugin interactions. Plugins are sandboxed modules with declared capabilities; a failing plugin does not crash the host. Data persists durably so nothing is lost across restarts. This milestone has no user-facing surface — it is the bedrock everything else stands on, verified entirely through tests. **Status: implemented** — the `itala-kernel`, `itala-plugin-api`, `itala-plugin-host`, and `itala-vfs-fs` crates are landed and green under `just ci`; see [the M0 plan](./plans/m0-foundation.md).
 
 ### M1 — Vaults & Notes
 Users can create, open, and switch between multiple vaults — logical containers of notes, assets, and configuration that default to a local folder but can be backed by any storage plugin. Notes are plain Markdown with optional YAML frontmatter. Moving, renaming, and deleting notes updates links automatically. File version history is maintained locally, with diff viewing and restore. This milestone ships first through the CLI, exercising the kernel and vault subsystem end-to-end.
@@ -95,6 +96,35 @@ The same core ships on multiple platforms, in stages:
 
 ---
 
+## Studio — The Notes Workspace *(post-launch-core direction)*
+
+> **Status:** The headline direction after the launch core ships. Not part of M0–M5; scoped in detail once MVP-α is green and a PRD lands under `docs/prds/`.
+
+You **capture**, **connect**, and **work with** your notes. The launch core owns the first two. **Studio** owns the third — a workspace surface, a peer to the editor, where notes stop being read-only documents and start being **inputs**.
+
+### The idea
+
+Any plugin that acts on notes — an exporter, a renderer, a command, a search, an AI provider — surfaces in Studio as an invokable **tool**. You bring notes into the workspace (a selection, a folder, a query result) and apply tools to them. The same plugins that power the rest of Itala become the building blocks of Studio, so the ecosystem built during M5 is the ecosystem Studio draws from on day one.
+
+Tools **compose**: chain several together to turn notes into a study guide, a merged report, a flashcard deck, or an export. Most users never see the plumbing — they pick a **recipe** (a one-click preset) and get a result. Power users open the workspace and rearrange the tools themselves.
+
+### Principles
+
+- **Deterministic-first.** Studio ships with offline, deterministic tools (merge, extract, format, summarize structure, build decks, export). AI is an opt-in tool type that arrives with the Intelligence milestone — never a dependency.
+- **One contract for every tool.** Deterministic and AI tools share the same interface, so they're interchangeable and composable. The "with or without AI" stance is structural, not a special case.
+- **Note-centric boundary.** Only plugins that *act on notes* become workspace tools. Infrastructure plugins (storage backends, sync transports, themes) stay under the hood. Studio is a focused surface, not a renamed copy of the whole app.
+- **Provenance and reproducibility.** Outputs are notes (so backlinks keep working) or linkable assets, and derived content carries citations back to its source notes. Saved recipes are reproducible and diff-able.
+
+### Why it follows the launch core
+
+Studio needs the editor (M2), the plugin ecosystem (M5), and benefits from a graphical shell — its exploratory, "playground" UX is awkward in a pure CLI. It is therefore a post-launch-core direction, sequenced after MVP-α, rather than crammed into M0–M5.
+
+### The convergence: Studio → automation
+
+A saved Studio composition, triggered by events instead of a button, *is* a workflow automation. Building Studio's composition engine now (designed to be event-triggerable) means the **Workflow automation** future direction falls out of it almost for free. See *Future directions* below.
+
+---
+
 ## Future directions *(not current priorities)*
 
 Revisited once the core system is shipped and adopted:
@@ -103,7 +133,7 @@ Revisited once the core system is shipped and adopted:
 - **Intelligence** — inline completions, semantic search, auto-tagging, link suggestions — local-first with zero data leaving the device by default.
 - **Advanced graph analytics** — note similarity, cluster detection, knowledge gap analysis.
 - **Whiteboard / canvas** — visual note-taking and spatial organization.
-- **Workflow automation** — trigger actions based on note changes (similar to IFTTT).
+- **Workflow automation** — trigger actions based on note changes (similar to IFTTT). Evolves naturally from Studio: a saved Studio composition, triggered by events instead of a button, *is* an automation.
 - **Mobile-first enhancements** — widgets, voice shortcuts, watch companion.
 - **Enterprise features** — team management, audit logs, SSO, policy enforcement.
 
@@ -111,4 +141,4 @@ Revisited once the core system is shipped and adopted:
 
 ## Status
 
-Greenfield — no source yet. [`VISION.md`](./VISION.md) holds the problem and goals; this roadmap is directional and will be updated as milestones ship and PRDs land under `docs/prds/`.
+M0 — Foundation is **implemented** (kernel, plugin API/host, local-FS VFS adapter). [`VISION.md`](./VISION.md) holds the problem and goals; this roadmap is directional and will be updated as milestones ship and PRDs land under `docs/prds/`.

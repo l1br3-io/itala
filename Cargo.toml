@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# `apps/*` re-joins when the first shell (itala-cli, MVP-α) lands.
 
 [workspace.package]
 edition = "2024"
@@ -10,6 +11,7 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 ulid          = { version = "1", features = ["serde"] }
 smol_str      = { version = "0.3", features = ["serde"] }
+derive_more   = { version = "2", features = ["display", "from", "into", "from_str"] }
 thiserror     = "2"
 serde         = { version = "1", features = ["derive"] }
 camino        = { version = "1", features = ["serde1"] }
@@ -34,8 +36,13 @@ anyhow        = "1"
 clap          = { version = "4", features = ["derive"] }
 assert_cmd    = "2"
 predicates    = "3"
-itala-kernel  = { path = "crates/itala-kernel" }
-itala-vault   = { path = "crates/itala-vault" }
+toml          = "0.9"
+semver        = { version = "1", features = ["serde"] }
+itala-kernel   = { path = "crates/itala-kernel" }
+itala-vault    = { path = "crates/itala-vault" }
+itala-plugin-api  = { path = "crates/itala-plugin-api" }
+itala-plugin-host = { path = "crates/itala-plugin-host" }
+itala-vfs-fs      = { path = "crates/itala-vfs-fs" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -1,0 +1,30 @@
+[package]
+name = "itala-plugin-host"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Discovery, loading, lifecycle, capability enforcement, and crash isolation for Itala plugins"
+
+[lints]
+workspace = true
+
+[dependencies]
+itala-kernel.workspace = true
+itala-plugin-api.workspace = true
+bytes.workspace = true
+tokio = { workspace = true, features = ["sync", "rt"] }
+tokio-util.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+smol_str.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+toml.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+serde.workspace = true
+semver.workspace = true
+itala-kernel = { workspace = true, features = ["test-support"] }
+itala-vfs-fs.workspace = true

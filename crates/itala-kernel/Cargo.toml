@@ -1,0 +1,42 @@
+[package]
+name = "itala-kernel"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Non-replaceable Itala core: shared types, event bus, VFS port, config, capabilities"
+
+[features]
+default = []
+# Enables the in-memory VFS and other test-only helpers. Intended for unit
+# tests in downstream crates and the kernel's own conformance suite.
+test-support = []
+
+[lints]
+workspace = true
+
+[dependencies]
+ulid.workspace = true
+smol_str.workspace = true
+derive_more.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+camino.workspace = true
+bytes.workspace = true
+tracing.workspace = true
+tokio = { workspace = true, features = ["sync", "time", "macros", "rt"] }
+tokio-util.workspace = true
+tokio-stream.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+time.workspace = true
+toml.workspace = true
+semver.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+insta.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+itala-kernel = { path = ".", features = ["test-support"] }

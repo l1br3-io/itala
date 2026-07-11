@@ -6,6 +6,8 @@
 
 Itala is a free, open-source **cross-platform knowledge management system** — a product of the **l1br3** organization (pronounced "libre") — for notes, links, and ideas. Every capability — editing, search, sync, AI, export — is a plugin. The core is a thin orchestration layer that provides shared primitives and lets plugins compose the full experience. Your data lives wherever you choose: plain Markdown files locally by default, with a pluggable storage layer that can back a vault with a database, an S3 bucket, IndexedDB, or any other backend.
 
+You **capture**, **connect**, and **work with** your notes. The first two are the editor and the knowledge graph; the third is **Studio** — a workspace surface where any plugin that acts on notes becomes a tool you can invoke and compose. Notes aren't just stored — they become inputs to study guides, summaries, reports, flashcards, exports, and more, through tool pipelines that work fully offline by default, with AI as an opt-in tool type.
+
 Itala runs on desktop, mobile, and the web from a single core. The same kernel logic runs everywhere; plugins adapt to platform capabilities while presenting a consistent experience. It is local-first and cloud-optional: all core functionality works entirely offline, and syncing or AI features are opt-in plugins that never send data the user hasn't explicitly chosen to share.
 
 The disruption: competitors are monolithic — they lock your data into proprietary formats or clouds, limit extensibility, and charge recurring subscriptions. Itala makes everything replaceable, keeps your data in plain Markdown you control, and lets the community build the ecosystem.
@@ -35,6 +37,7 @@ The core pains:
 4. **Plugin limitations** — existing plugin systems are constrained, unsandboxed, or limited to one language.
 5. **Cost** — recurring subscriptions for personal knowledge management.
 6. **Privacy erosion** — cloud-only tools send your thoughts to third-party servers by default.
+7. **Dead-end documents** — notes are captured but rarely reshaped; even tools that transform them tend to be opaque and non-composable, giving you fixed outputs in a fixed way rather than letting you assemble your own workflows.
 
 Itala solves this by making every capability a plugin, keeping your data in plain Markdown you control, and letting the community compose the full experience — local-first, cross-platform, and extensible by design.
 
@@ -52,6 +55,7 @@ Every functional area of Itala is a plugin:
 - **Sync providers** (peer-to-peer, relay server, Git)
 - **AI services** (local models, cloud APIs)
 - **Export formats** (PDF, HTML, DOCX)
+- **Studio tools** (deterministic + AI transforms that act on notes)
 
 Plugins are discoverable, installable, and composable. Users can replace or extend any part of the system.
 
@@ -62,6 +66,10 @@ All core functionality works entirely offline. The user's data lives wherever th
 ### Extensible Knowledge Graph
 
 Notes link to each other via `[[wiki-style]]` links, block references, and tags. The system maintains a live graph of connections. Backlinks, unlinked mentions, and graph visualizations are first-class features.
+
+### Studio — A Workspace for Your Notes
+
+Studio treats *working with notes* as a first-class act. Any plugin that acts on notes — an exporter, a renderer, a command, a search, an AI provider — surfaces as an invokable **tool**. Tools compose into pipelines: chain a few together to turn notes into a study guide, a merged report, a flashcard deck, or an export. Deterministic tools run offline on day one; AI is an opt-in tool type, not a dependency. Saved compositions (**recipes**) are shareable presets that reproduce a workflow in one click. Studio is note-centric by design — infrastructure plugins (storage, sync, themes) stay under the hood; only note-acting plugins become workspace tools.
 
 ### Cross-Platform Consistency
 
@@ -82,6 +90,7 @@ A central hub allows users to browse, install, rate, and share plugins and workf
 | Plain Markdown, no lock-in | Notes stored as `.md` files with optional YAML frontmatter |
 | Cross-platform from one core | CLI, desktop, and web from the same kernel logic |
 | Knowledge graph built-in | Wiki links, backlinks, and unlinked mentions on day one |
+| Work with notes, not just store them | Studio ships with deterministic tools that compose into workflows — fully offline on day one |
 | Plugin ecosystem from the start | Install from a curated repo in the MVP |
 | Fast | Cold startup < 500 ms desktop; open a 10 KB note < 50 ms; search 10k notes < 200 ms |
 | Genuinely free | $0 monthly app cost; MIT OR Apache-2.0 |
@@ -93,7 +102,7 @@ A central hub allows users to browse, install, rate, and share plugins and workf
 
 - Real-time collaborative editing.
 - Mobile applications (iOS, Android).
-- AI-powered features (completions, semantic search, auto-tagging).
+- AI-powered features (completions, semantic search, auto-tagging). Studio ships with **deterministic** tools only; AI-powered Studio tools arrive with the Intelligence milestone.
 - Advanced PDF annotation.
 - Plugin development SDK stabilization.
 
@@ -111,10 +120,10 @@ A central hub allows users to browse, install, rate, and share plugins and workf
 | Persona | Description | Key need |
 |---------|-------------|----------|
 | **The Knowledge Worker** *(primary)* | Takes notes daily; links ideas; navigates a growing personal knowledge base | A fast, reliable editor with wiki links and backlinks — local-first, no cloud dependency |
-| The Developer / Power User | Wants to extend the system, write plugins, customize workflows | A stable plugin API, sandboxed execution, and multiple plugin languages (Rust, WASM, Lua) |
+| The Developer / Power User | Wants to extend the system, write plugins, customize workflows | A stable plugin API, sandboxed execution, multiple plugin languages (Rust, WASM, Lua), and Studio as a composition playground for tools |
 | The Privacy-Conscious User | Values data sovereignty; rejects cloud-only tools | Local-first, plain Markdown, optional encryption at rest, zero telemetry by default |
 | The Cross-Platform User | Works across desktop, mobile, and browser | One consistent experience from a shared core, with optional sync |
-| The Researcher / Academic | Manages PDFs, highlights, citations, and a knowledge graph | PDF annotation, extract highlights to notes, link annotations, block references |
+| The Researcher / Academic | Manages PDFs, highlights, citations, and a knowledge graph | PDF annotation, extract highlights to notes, link annotations, block references; turn highlights into study artifacts via Studio |
 | The Open-Source Advocate | Prefers community-driven, transparent tools | Free, open-source, community hub for plugins and presets |
 
 ---

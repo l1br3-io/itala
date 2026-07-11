@@ -1,0 +1,24 @@
+[package]
+name = "itala-plugin-api"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Stable, semver'd contract that Itala plugins compile against"
+
+[lints]
+workspace = true
+
+[dependencies]
+itala-kernel.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+smol_str.workspace = true
+bytes.workspace = true
+tracing.workspace = true
+semver.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }

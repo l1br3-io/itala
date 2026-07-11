@@ -1,0 +1,30 @@
+[package]
+name = "itala-vfs-fs"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Local-filesystem VFS adapter for Itala, with file watching"
+
+[lints]
+workspace = true
+
+[dependencies]
+itala-kernel.workspace = true
+tokio = { workspace = true, features = ["fs", "sync", "rt", "io-util"] }
+tokio-stream.workspace = true
+tokio-util.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+notify.workspace = true
+camino.workspace = true
+bytes.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+time.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+toml.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+itala-kernel = { workspace = true, features = ["test-support"] }
