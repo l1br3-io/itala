@@ -1,6 +1,6 @@
 //! Non-replaceable Itala core: shared types, event bus, VFS port, config registry,
 //! and the capability system that mediates plugin interactions routed through
-//! host APIs (see [ADR-0005](../../docs/adr/0005-plugin-trust-and-rollout.md):
+//! host APIs (see [ADR-0005](../../../docs/adrs/0005-plugin-trust-and-rollout.md):
 //! capability checks are policy and audit, not a security sandbox for native
 //! code; WASM at M5 makes them enforceable for third-party code).
 //!

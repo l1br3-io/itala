@@ -5,7 +5,7 @@
 //! lacking a capability receives [`itala_kernel::Error::CapabilityDenied`].
 //!
 //! This is a **policy and audit** choke point, not a security boundary
-//! (see [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)):
+//! (see [ADR-0005](../../../docs/adrs/0005-plugin-trust-and-rollout.md)):
 //! trusted native plugins retain ambient host authority and can bypass the
 //! context. WASM components at M5 will make the same checks enforceable
 //! because they have no ambient authority.
@@ -22,7 +22,7 @@ use itala_kernel::{PluginId, Result};
 /// capability policy/audit check on each method. Plugins are *expected* to
 /// route every privileged operation through this context; native plugins,
 /// however, retain ambient host authority and can bypass it (see
-/// [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)). The M5
+/// [ADR-0005](../../../docs/adrs/0005-plugin-trust-and-rollout.md)). The M5
 /// WASM runtime removes that ambient authority, making the context
 /// enforceable for third-party code.
 #[async_trait]

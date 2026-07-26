@@ -1,7 +1,7 @@
 # Roadmap
 
 > **Status:** Directional — no dates, no calendar. Product-level; implementation detail lives
-> in [`SPEC.md`](../SPEC.md) (current phase) and the [architecture doc](./ARCHITECTURE.md).
+> in [`specs/m2-write-engine/spec.md`](./specs/m2-write-engine/spec.md) (current effort) and the [architecture doc](./ARCHITECTURE.md).
 
 Itala is a free, open-source **cross-platform knowledge management system**: durable content
 as plain Markdown you control, useful first-party capabilities behind explicit contracts, and
@@ -18,24 +18,25 @@ VISION   "What problem are we solving?"   docs/VISION.md
   │
 ROADMAP  "What directions / milestones?"  docs/ROADMAP.md  (this)
   │
-SPEC     "Current phase requirements"     SPEC.md  (root, one per phase)
+SPEC     "Current effort requirements"    docs/specs/<effort-slug>/spec.md
 ```
 
-### Each milestone ships through the harness lifecycle
+Each effort ships through the harness lifecycle
 
 ```text
-DEFINE → /spec       spec-driven-development             → SPEC.md
-PLAN   → /planning   planning-and-task-breakdown          → tasks/plan.md + tasks/todo.md
-BUILD  → /build      incremental-implementation + TDD     → source + tests
-VERIFY → /test       debugging-and-error-recovery         → pnpm verify green
-REVIEW → /review     code-review-and-quality              → sign-off
-SHIP   → /ship       shipping-and-launch                  → tasks/archive/<date>-<slug>/{SPEC.md, plan.md, todo.md}
+DEFINE → /spec       spec-driven-development             → docs/specs/<slug>/spec.md (status: draft)
+PLAN   → /planning   planning-and-task-breakdown         → docs/specs/<slug>/{plan.md, todo.md, tasks/00N-*.md}
+BUILD  → /build      incremental-implementation + TDD    → source + tests (flips spec status: draft → active)
+VERIFY → /test       debugging-and-error-recovery        → pnpm verify green
+REVIEW → /review     code-review-and-quality             → sign-off
+SHIP   → /ship       shipping-and-launch                 → merge PR; spec status flips to shipped (dir stays in place)
 ```
 
-When a phase ships, its SPEC.md + plan.md + todo.md archive **together**
-under `tasks/archive/YYYY-MM-DD-<slug>/`, and the next phase starts fresh
-at `/spec`. A plan never outlives its phase; a spec never outlives its
-plan.
+When an effort ships, its spec.md frontmatter flips to status: shipped
+with the merge date. The directory stays at docs/specs/<slug>/ forever —
+no archive step, no move. Git is the full history; the filesystem is the
+browsable index. The next effort starts on a fresh branch with a fresh
+docs/specs/<new-slug>/ directory.
 
 ---
 
@@ -57,7 +58,7 @@ as a post-launch direction.
 
 ## Milestones
 
-**CURRENT MILESTONE: M2 — Write Engine** (draft spec in [`../SPEC.md`](../SPEC.md)).
+**CURRENT MILESTONE: M2 — Write Engine** (draft spec in [`specs/m2-write-engine/spec.md`](./specs/m2-write-engine/spec.md)).
 
 | # | Milestone | State |
 |---|-----------|-------|
@@ -89,5 +90,5 @@ next one starts.
 
 ---
 
-- Decisions: [`adr/`](./adr/) (immutable; supersede via a new ADR).
+- Decisions: [`adrs/`](./adrs/) (immutable; supersede via a new ADR).
 - How it's built: [`ARCHITECTURE.md`](./ARCHITECTURE.md).

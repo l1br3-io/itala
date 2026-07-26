@@ -1,10 +1,15 @@
+---
+status: draft
+started: 2026-07-27
+---
+
 # SPEC — M2: Write Engine
 
-> **Status:** DRAFT — current phase spec. Seeded from the former functional-contracts doc
+> **Status:** DRAFT — current effort spec. Seeded from the former functional-contracts doc
 > (Note Editing) and the roadmap M2 narrative; elaborate via `/spec` before building.
 > **Phase:** M2 — Write Engine (current).
-> **Architecture:** [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
-> **Decisions:** [ADR-0006](./docs/adr/0006-markdown-canonical-source.md) (Markdown canonical).
+> **Architecture:** [`ARCHITECTURE.md`](../../ARCHITECTURE.md).
+> **Decisions:** [ADR-0006](../../adrs/0006-markdown-canonical-source.md) (Markdown canonical).
 
 M2 gives the shared core the document engine needed by every future writing surface.
 Markdown remains the canonical source of truth (ADR-0006); the document model and editing
@@ -39,5 +44,5 @@ experience with real-time rendering. Both preserve Markdown as canonical data.
 
 ---
 
-_This is a draft phase spec. Run `/spec` to refine requirements and acceptance criteria,
-then `/planning` to produce `tasks/plan.md` + `tasks/todo.md`._
+_This is a draft effort spec. Run `/spec` to refine requirements and acceptance criteria,
+then `/planning` to decompose into [`plan.md`](./plan.md) + [`todo.md`](./todo.md)._

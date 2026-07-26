@@ -1,7 +1,7 @@
 # Todo — M2: Write Engine (current phase)
 
 > **Status:** No tasks yet — M2 is specced only as a draft. Populate via `/planning`.
-> Spec: [`../SPEC.md`](../SPEC.md). Plan: [`plan.md`](./plan.md).
+> Spec: [`spec.md`](./spec.md). Plan: [`plan.md`](./plan.md).
 
 ## M2 — Write Engine
 

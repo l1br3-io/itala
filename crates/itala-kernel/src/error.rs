@@ -79,7 +79,7 @@ pub enum Error {
     /// `JoinError::is_panic()` from a spawned lifecycle call (`initialize`,
     /// `activate`, or `deactivate`); it is **not** a security boundary —
     /// native code retains ambient authority and can bypass host policy
-    /// (see [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)).
+    /// (see [ADR-0005](../../../docs/adrs/0005-plugin-trust-and-rollout.md)).
     #[error("plugin '{0}' crashed during a lifecycle task and was deactivated")]
     PluginCrashed(PluginId),
 

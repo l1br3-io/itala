@@ -14,7 +14,7 @@ use crate::context::PluginContext;
 /// [`itala_kernel::Error::PluginCrashed`]). This is best-effort resilience
 /// to ordinary bugs, **not** a security boundary — native plugins retain
 /// ambient authority and can bypass host policy (see
-/// [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)).
+/// [ADR-0005](../../../docs/adrs/0005-plugin-trust-and-rollout.md)).
 #[async_trait]
 pub trait Plugin: Send + Sync {
     /// Returns the plugin's stable identifier (must match its manifest).

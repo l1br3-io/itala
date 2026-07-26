@@ -5,7 +5,7 @@
 //! capabilities in their manifest; the user *grants* them; the host applies
 //! them as **policy and audit** at privileged calls routed through
 //! `PluginContext` — not a security sandbox for native code (see
-//! [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)). WASM at M5
+//! [ADR-0005](../../../docs/adrs/0005-plugin-trust-and-rollout.md)). WASM at M5
 //! makes these checks enforceable for third-party code. The
 //! [`CapabilityRegistry`] tracks granted capabilities per plugin and is
 //! queryable at runtime.

@@ -26,7 +26,7 @@ pub type PluginFactory = Box<dyn Fn() -> Box<dyn Plugin> + Send + Sync>;
 ///
 /// Native M0 plugins are trusted and can bypass this policy; WASM at M5
 /// makes it enforceable for third-party code
-/// (see [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)).
+/// (see [ADR-0005](../../../docs/adrs/0005-plugin-trust-and-rollout.md)).
 pub struct PluginHost {
     bus: EventBus,
     caps: Arc<CapabilityRegistry>,

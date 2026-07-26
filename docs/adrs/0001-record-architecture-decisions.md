@@ -11,7 +11,7 @@ Code and the [architecture overview](../ARCHITECTURE.md) describe *what* the sys
 
 ## Decision
 
-We will keep Architecture Decision Records (ADRs) in [`docs/adr/`](./), one file per significant decision, using the Michael Nygard template (Context, Decision, Consequences). ADRs are numbered, append-only, and dated. To change an accepted decision we supersede it with a new ADR rather than editing the original.
+We will keep Architecture Decision Records (ADRs) in [`docs/adrs/`](./), one file per significant decision, using the Michael Nygard template (Context, Decision, Consequences). ADRs are numbered, append-only, and dated. To change an accepted decision we supersede it with a new ADR rather than editing the original.
 
 ## Consequences
 

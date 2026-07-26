@@ -2,7 +2,7 @@
 //! `tokio::sync::broadcast`.
 //!
 //! Delivery is **best-effort to active subscribers** (see
-//! [ADR-0007](../../../docs/adr/0007-best-effort-event-delivery.md)): the
+//! [ADR-0007](../../../docs/adrs/0007-best-effort-event-delivery.md)): the
 //! channel is bounded (capacity ≥ 1024 by default), and a slow subscriber that
 //! falls behind the buffer window observes a
 //! [`Lagged`](tokio::sync::broadcast::error::RecvError::Lagged) condition and

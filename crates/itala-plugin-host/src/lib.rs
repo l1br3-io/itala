@@ -10,7 +10,7 @@
 //! containment is resilience to ordinary bugs rather than isolation of
 //! malicious code. WASM at M5 will make both guarantees enforceable for
 //! third-party code (see
-//! [ADR-0005](../../docs/adr/0005-plugin-trust-and-rollout.md)).
+//! [ADR-0005](../../../docs/adrs/0005-plugin-trust-and-rollout.md)).
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

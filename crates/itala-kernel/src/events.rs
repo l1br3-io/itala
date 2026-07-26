@@ -5,7 +5,7 @@
 //! subscribers**: a slow subscriber that falls behind observes a `Lagged`
 //! condition and must reconcile from canonical state. Handlers must therefore
 //! be idempotent (duplicate notifications and rebuilds are valid). See
-//! [ADR-0007](../../../docs/adr/0007-best-effort-event-delivery.md).
+//! [ADR-0007](../../../docs/adrs/0007-best-effort-event-delivery.md).
 
 use smol_str::SmolStr;
 
@@ -64,7 +64,7 @@ pub enum KernelEvent {
         key: String,
     },
     /// The vault's storage selection for a derived-state domain changed
-    /// (see [ADR-0004](../../../docs/adr/0004-derived-state-storage-strategy.md) §4).
+    /// (see [ADR-0004](../../../docs/adrs/0004-derived-state-storage-strategy.md) §4).
     /// A live hot-swap is generally not possible — outstanding
     /// `Arc<dyn Dyn*Store>` references keep the old backend alive — so the
     /// typical reaction is to schedule a vault reopen.

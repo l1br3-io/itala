@@ -1,9 +1,15 @@
+---
+status: shipped
+started: 2026-05-29
+shipped: 2026-05-29
+---
+
 # SPEC — M1: Vaults & Notes
 
-> **Status:** Shipped — archived. Paired with `plan.md` and `todo.md` in this folder.
+> **Status:** Shipped. Paired with `plan.md` and `todo.md` in this folder.
 > **Phase:** M1 — Vaults & Notes (CLI-first MVP-α increment).
-> **Architecture:** [`ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md) (§2 crate map, §5 data model, §6 flows).
-> **Decisions:** [ADR-0004](../../../docs/adr/0004-derived-state-storage-strategy.md) (derived-state storage), [ADR-0006](../../../docs/adr/0006-markdown-canonical-source.md) (Markdown canonical).
+> **Architecture:** [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (§2 crate map, §5 data model, §6 flows).
+> **Decisions:** [ADR-0004](../../adrs/0004-derived-state-storage-strategy.md) (derived-state storage), [ADR-0006](../../adrs/0006-markdown-canonical-source.md) (Markdown canonical).
 
 This is the phase spec for M1, extracted from the former omnibus functional-contracts
 document. It states the user-visible requirements the phase had to satisfy.

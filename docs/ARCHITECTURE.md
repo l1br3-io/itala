@@ -1,11 +1,11 @@
 # Architecture
 
 > **Audience:** a contributor about to make their first change.
-> **Scope:** *how* Itala is built — the layering, the crate graph, the kernel and plugin design, the data model, and the key data flows. For *what* the product does, see the [roadmap](./ROADMAP.md) for milestone direction and the current-phase requirements in [`../SPEC.md`](../SPEC.md); for *why* specific choices were made, see the [decision records](./adr/).
+> **Scope:** *how* Itala is built — the layering, the crate graph, the kernel and plugin design, the data model, and the key data flows. For *what* the product does, see the [roadmap](./ROADMAP.md) for milestone direction and the current-effort requirements in [`./specs/m2-write-engine/spec.md`](./specs/m2-write-engine/spec.md); for *why* specific choices were made, see the [decision records](./adrs/).
 
 ## Status
 
-Itala is **greenfield with M0 and M1 landed**: the `itala-kernel` (shared types, event bus, VFS port, config registry, capability policy, manifest model, durable `Kernel`, **history port**), `itala-plugin-api` (experimental `Plugin`/`PluginContext` contract), `itala-plugin-host` (discovery, loading, panic-contained lifecycle calls, capability checks + audit), `itala-vfs-fs` (local-filesystem adapter with file watching), **`itala-note`** (note data model, frontmatter parser), **`itala-vault`** (vault lifecycle, note CRUD, link rewriting, history integration), and **`itala-store-files`** (JSON-on-Vfs derived-state adapter, ADR-0004 §3) are implemented and verified end-to-end through the [M1 integration suite](../tasks/archive/2026-05-29-m1-vaults-notes/plan.md). The first shell — **`apps/itala-cli`** (clap+tokio, MVP-α) — is wired through every port. Bounded contexts still to land: the M2 document engine, `itala-graph` (M3), and search adapters (M4). CRDT evaluation is deferred until synchronization or collaboration requires it. This document remains the blueprint code is built and reviewed against; sections describing unbuilt parts are marked *(target)*. As code lands, this doc is updated to reflect *what is* rather than only *what is intended*. Phasing lives in the [roadmap](./ROADMAP.md); this doc is deliberately phasing-agnostic.
+Itala is **greenfield with M0 and M1 landed**: the `itala-kernel` (shared types, event bus, VFS port, config registry, capability policy, manifest model, durable `Kernel`, **history port**), `itala-plugin-api` (experimental `Plugin`/`PluginContext` contract), `itala-plugin-host` (discovery, loading, panic-contained lifecycle calls, capability checks + audit), `itala-vfs-fs` (local-filesystem adapter with file watching), **`itala-note`** (note data model, frontmatter parser), **`itala-vault`** (vault lifecycle, note CRUD, link rewriting, history integration), and **`itala-store-files`** (JSON-on-Vfs derived-state adapter, ADR-0004 §3) are implemented and verified end-to-end through the [M1 integration suite](./specs/m1-vaults-notes/plan.md). The first shell — **`apps/itala-cli`** (clap+tokio, MVP-α) — is wired through every port. Bounded contexts still to land: the M2 document engine, `itala-graph` (M3), and search adapters (M4). CRDT evaluation is deferred until synchronization or collaboration requires it. This document remains the blueprint code is built and reviewed against; sections describing unbuilt parts are marked *(target)*. As code lands, this doc is updated to reflect *what is* rather than only *what is intended*. Phasing lives in the [roadmap](./ROADMAP.md); this doc is deliberately phasing-agnostic.
 
 ---
 
@@ -110,7 +110,7 @@ The kernel is intentionally small. Together with the core bounded contexts and p
 
 ### 3.1 Shared types
 
-- **IDs:** `ULID` (see [ADR backlog](./adr/README.md#candidate-adrs-to-be-written-as-decisions-crystallize)) for notes and other entities; lexicographically sortable, no coordination required.
+- **IDs:** `ULID` (see [ADR backlog](./adrs/README.md#candidate-adrs-to-be-written-as-decisions-crystallize)) for notes and other entities; lexicographically sortable, no coordination required.
 - **Paths:** `camino::Utf8PathBuf` — UTF-8 paths throughout, avoiding OS-string friction across platforms (including the WASM target).
 - **Strings:** `smol_str::SmolStr` for cheaply-cloned identifiers.
 - **Errors:** a base `itala_kernel::Error` (via `thiserror`); each crate defines its own typed error that integrates with it. See [§7.1 Error strategy](#71-error-strategy).
@@ -118,7 +118,7 @@ The kernel is intentionally small. Together with the core bounded contexts and p
 
 ### 3.2 Event bus
 
-The bus is the default decoupled cross-context notification channel. It is an in-process, typed pub/sub backed by bounded broadcast queues. Delivery is **best effort to active subscribers**: a subscriber that falls behind receives an explicit lag error and must reconcile from canonical Markdown or durable state. Events are not a durable log and are not described as at-least-once. Handlers remain idempotent because duplicate notifications and rebuilds are valid. Events are async; the hot path does not round-trip through the bus. [ADR-0007](./adr/0007-best-effort-event-delivery.md) defines this contract.
+The bus is the default decoupled cross-context notification channel. It is an in-process, typed pub/sub backed by bounded broadcast queues. Delivery is **best effort to active subscribers**: a subscriber that falls behind receives an explicit lag error and must reconcile from canonical Markdown or durable state. Events are not a durable log and are not described as at-least-once. Handlers remain idempotent because duplicate notifications and rebuilds are valid. Events are async; the hot path does not round-trip through the bus. [ADR-0007](./adrs/0007-best-effort-event-delivery.md) defines this contract.
 
 Representative events *(the enum is non-exhaustive and grows with milestones)*:
 
@@ -133,7 +133,7 @@ Representative events *(the enum is non-exhaustive and grows with milestones)*:
 | `IndexRebuildRequested` | search/CLI | search adapter |
 | `PluginLoaded { id }` | plugin host | contexts that requested a capability |
 | `ConfigChanged { key }` | config registry | live views, plugins with config-driven behavior |
-| `StorageChanged { domain, backend }` | shell (vault-open wiring) | contexts that hold a storage backend (schedule vault reopen; see [ADR-0004](./adr/0004-derived-state-storage-strategy.md)) |
+| `StorageChanged { domain, backend }` | shell (vault-open wiring) | contexts that hold a storage backend (schedule vault reopen; see [ADR-0004](./adrs/0004-derived-state-storage-strategy.md)) |
 
 ### 3.3 VFS port
 
@@ -162,7 +162,7 @@ A typed, layered config store (defaults → vault `.itala/` config → runtime o
 
 ### 3.5 Capability system
 
-The capability system defines which host operations a plugin may request. A capability is a named, revocable grant (e.g., `vault.read`, `vault.write`, `network.outbound`, `search.index`, `ui.panel`). Plugins **declare** required capabilities in their manifest; the user **grants** them; the host checks every privileged host call and records usage in an audit log. These checks become a security boundary when combined with the M5 WASM runtime's lack of ambient authority; for trusted native components they remain policy and audit. This is detailed in [§4.4](#44-capabilities--permissions) and [ADR-0005](./adr/0005-plugin-trust-and-rollout.md).
+The capability system defines which host operations a plugin may request. A capability is a named, revocable grant (e.g., `vault.read`, `vault.write`, `network.outbound`, `search.index`, `ui.panel`). Plugins **declare** required capabilities in their manifest; the user **grants** them; the host checks every privileged host call and records usage in an audit log. These checks become a security boundary when combined with the M5 WASM runtime's lack of ambient authority; for trusted native components they remain policy and audit. This is detailed in [§4.4](#44-capabilities--permissions) and [ADR-0005](./adrs/0005-plugin-trust-and-rollout.md).
 
 ---
 
@@ -222,7 +222,7 @@ WASM plugins run with no host access except through granted capabilities — no 
 - **Link:** source note · target (note id | URL | block ref) · link type · source position · display text.
 - **Vault:** root URI · configuration · installed-plugins list.
 
-Invariants: the persisted Markdown file is the canonical source of truth. A note's checksum is recomputed on every persisted change; frontmatter is authoritative for metadata and the Markdown body is authoritative for prose. Parsed syntax trees, editor transactions, indexes, recovery journals, and any future CRDT state are subordinate working or derived representations. They must reconcile with external file edits and project accepted changes back to Markdown (see [§6.2](#62-save--index) and [ADR-0006](./adr/0006-markdown-canonical-source.md)).
+Invariants: the persisted Markdown file is the canonical source of truth. A note's checksum is recomputed on every persisted change; frontmatter is authoritative for metadata and the Markdown body is authoritative for prose. Parsed syntax trees, editor transactions, indexes, recovery journals, and any future CRDT state are subordinate working or derived representations. They must reconcile with external file edits and project accepted changes back to Markdown (see [§6.2](#62-save--index) and [ADR-0006](./adrs/0006-markdown-canonical-source.md)).
 
 ### 5.2 On-disk layout
 
@@ -388,8 +388,8 @@ The same kernel logic runs everywhere; shells and adapters adapt to platform cap
 |----------|--------|
 | What problem does Itala solve? | [VISION.md](./VISION.md) |
 | What is being built and when? | [ROADMAP.md](./ROADMAP.md) |
-| What does the product do (current-phase requirements)? | [SPEC.md](../SPEC.md) (root) |
-| Why were specific choices made? | [adr/](./adr/) |
+| What does the product do (current-effort requirements)? | [specs/](./specs/) |
+| Why were specific choices made? | [adrs/](./adrs/) |
 | How is it built? (this doc) | [ARCHITECTURE.md](./ARCHITECTURE.md) |
 
-_This is a living document describing the intended architecture of Itala. It guides development priorities and is updated as crates land and decisions are recorded in the [ADR log](./adr/)._
+_This is a living document describing the intended architecture of Itala. It guides development priorities and is updated as crates land and decisions are recorded in the [ADR log](./adrs/)._

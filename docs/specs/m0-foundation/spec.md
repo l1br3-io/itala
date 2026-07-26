@@ -1,12 +1,18 @@
+---
+status: shipped
+started: 2026-07-12
+shipped: 2026-07-12
+---
+
 # SPEC — M0: Foundation
 
-> **Status:** Shipped — archived. Paired with `plan.md` and `todo.md` in this folder.
+> **Status:** Shipped. Paired with `plan.md` and `todo.md` in this folder.
 > **Phase:** M0 — Foundation (infrastructure; no user-facing surface).
-> **Architecture:** [`ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md) (§3 Kernel, §4 Plugin System).
-> **Decisions:** [ADR-0002](../../../docs/adr/0002-rust-native-plugins-m0.md) (superseded by ADR-0005),
-> [ADR-0003](../../../docs/adr/0003-async-trait-dynvfs.md) (`async-trait` DynVfs),
-> [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md) (plugin trust & rollout),
-> [ADR-0007](../../../docs/adr/0007-best-effort-event-delivery.md) (best-effort events).
+> **Architecture:** [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (§3 Kernel, §4 Plugin System).
+> **Decisions:** [ADR-0002](../../adrs/0002-rust-native-plugins-m0.md) (superseded by ADR-0005),
+> [ADR-0003](../../adrs/0003-async-trait-dynvfs.md) (`async-trait` DynVfs),
+> [ADR-0005](../../adrs/0005-plugin-trust-and-rollout.md) (plugin trust & rollout),
+> [ADR-0007](../../adrs/0007-best-effort-event-delivery.md) (best-effort events).
 
 M0 had no dedicated product-requirements section (it is pure infrastructure with no
 user-facing surface). This spec is drawn from the phase plan's overview and exit condition;

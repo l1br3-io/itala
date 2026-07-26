@@ -6,7 +6,7 @@
 //! keeps running. This is best-effort resilience to ordinary bugs, **not** a
 //! security boundary — native plugins can still corrupt process state or
 //! call `abort()` (see
-//! [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)).
+//! [ADR-0005](../../../docs/adrs/0005-plugin-trust-and-rollout.md)).
 
 use std::sync::Arc;
 

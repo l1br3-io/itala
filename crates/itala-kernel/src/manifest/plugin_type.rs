@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// `#[M5 initial]` variants (`Tool`, `Exporter`, `Command`, `Renderer`) ship
 /// as the first public WASM extension surfaces; the others remain future
 /// replacement surfaces (see
-/// [ADR-0005](../../../../docs/adr/0005-plugin-trust-and-rollout.md) and
+/// [ADR-0005](../../../../docs/adrs/0005-plugin-trust-and-rollout.md) and
 /// ARCHITECTURE.md §4.1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
