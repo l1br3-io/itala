@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Discovery, loading, lifecycle, capability enforcement, and crash isolation for Itala plugins"
+description = "Discovery, loading, lifecycle, capability policy/audit, and panic containment for Itala plugins"
 
 [lints]
 workspace = true

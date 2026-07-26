@@ -1,5 +1,11 @@
-//! [`HostContext`] — the host's [`PluginContext`] implementation that enforces
-//! capabilities on every privileged call.
+//! [`HostContext`] — the host's [`PluginContext`] implementation that applies
+//! the capability policy/audit check to privileged calls routed through it.
+//!
+//! This is a **policy and audit** boundary, not a security sandbox (see
+//! [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)): native
+//! plugins can bypass `PluginContext` and access the host directly. WASM at
+//! M5 will make the same checks enforceable by giving third-party code no
+//! ambient authority.
 
 use std::sync::Arc;
 
@@ -65,7 +71,7 @@ impl PluginContext for HostContext {
 
     async fn write_file(&self, path: &VfsPath, data: Bytes) -> Result<()> {
         let _span = audit::call_span(&self.plugin, "write_file");
-        self.require(&Capability::new("vault.write"))?;
+        self.require(&Capability::vault_write())?;
         self.vfs.write(path, data).await
     }
 }

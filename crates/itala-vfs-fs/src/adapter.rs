@@ -79,7 +79,10 @@ impl Vfs for LocalFsVfs {
 
     async fn list(&self, dir: &VfsPath) -> Result<Vec<DirEntry>> {
         let full = self.resolve(dir)?;
-        let mut rd = tokio::fs::read_dir(&full).await?;
+        let mut rd = match tokio::fs::read_dir(&full).await {
+            Ok(rd) => rd,
+            Err(e) => return Err(map_not_found(e, dir)),
+        };
         let mut entries = Vec::new();
         while let Some(entry) = rd.next_entry().await? {
             let meta = entry.metadata().await?;

@@ -1,4 +1,4 @@
-//! [`PluginHost`] — discovery, loading, lifecycle, and capability enforcement.
+//! [`PluginHost`] — discovery, loading, lifecycle, and capability policy/audit.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -20,8 +20,13 @@ use crate::registry::LoadedPlugin;
 /// A factory that instantiates a plugin instance.
 pub type PluginFactory = Box<dyn Fn() -> Box<dyn Plugin> + Send + Sync>;
 
-/// The plugin host: discovers, loads, drives lifecycle for, and enforces
-/// capabilities on plugins.
+/// The plugin host: discovers, loads, drives lifecycle, and applies the
+/// capability policy/audit check to privileged calls routed through
+/// `PluginContext`.
+///
+/// Native M0 plugins are trusted and can bypass this policy; WASM at M5
+/// makes it enforceable for third-party code
+/// (see [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)).
 pub struct PluginHost {
     bus: EventBus,
     caps: Arc<CapabilityRegistry>,

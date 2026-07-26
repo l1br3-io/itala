@@ -1,8 +1,13 @@
 //! The [`KernelEvent`] enum — the typed payload carried on the event bus.
 //!
 //! Events are the *only* cross-context communication channel (see the
-//! architecture doc, §3.2). The bus provides at-least-once delivery; handlers
-//! must therefore be idempotent.
+//! architecture doc, §3.2). The bus provides **best-effort delivery to active
+//! subscribers**: a slow subscriber that falls behind observes a `Lagged`
+//! condition and must reconcile from canonical state. Handlers must therefore
+//! be idempotent (duplicate notifications and rebuilds are valid). See
+//! [ADR-0007](../../../docs/adr/0007-best-effort-event-delivery.md).
+
+use smol_str::SmolStr;
 
 use crate::{NoteId, PluginId, VaultId};
 
@@ -57,6 +62,18 @@ pub enum KernelEvent {
     ConfigChanged {
         /// The dotted config key that changed.
         key: String,
+    },
+    /// The vault's storage selection for a derived-state domain changed
+    /// (see [ADR-0004](../../../docs/adr/0004-derived-state-storage-strategy.md) §4).
+    /// A live hot-swap is generally not possible — outstanding
+    /// `Arc<dyn Dyn*Store>` references keep the old backend alive — so the
+    /// typical reaction is to schedule a vault reopen.
+    StorageChanged {
+        /// The derived-state domain that changed backends
+        /// (e.g. `"history"`, `"graph"`, `"search"`).
+        domain: SmolStr,
+        /// The new backend identifier (e.g. `"files"`, `"sqlite"`).
+        backend: SmolStr,
     },
 }
 

@@ -30,15 +30,16 @@ ADRs are append-only. To change an accepted decision, write a new ADR that **sup
 | # | Decision | Status |
 |---|----------|--------|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
-| [0002](0002-rust-native-plugins-m0.md) | Rust-native plugins for M0, WASM deferred to M5 | Accepted |
+| [0002](0002-rust-native-plugins-m0.md) | Rust-native plugins for M0, WASM deferred to M5 | Superseded by 0005 |
 | [0003](0003-async-trait-dynvfs.md) | `async-trait` for the object-safe `DynVfs` shadow | Accepted |
+| [0004](0004-derived-state-storage-strategy.md) | Per-domain ports for derived-state storage, with per-vault backend selection | Accepted |
+| [0005](0005-plugin-trust-and-rollout.md) | Trusted native components now; sandboxed WASM extensions at M5 | Accepted |
+| [0006](0006-markdown-canonical-source.md) | Markdown is the canonical note representation | Accepted |
+| [0007](0007-best-effort-event-delivery.md) | Bounded best-effort events with explicit reconciliation | Accepted |
 
 ## Candidate ADRs (to be written as decisions crystallize)
 
 - ULID as the canonical note identifier.
-- CRDT (Yjs/Yrs) as the note body and sync substrate.
+- CRDT selection as an optional synchronization/collaboration substrate.
 - Hexagonal architecture (ports & adapters) with a strict dependency direction.
-- WASM as the portable plugin sandbox.
-- Event bus as the only cross-context communication channel.
-- Markdown + YAML frontmatter as the durable on-disk note format.
 - BLAKE3 as the content checksum.

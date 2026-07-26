@@ -1,24 +1,24 @@
 # Architecture
 
 > **Audience:** a contributor about to make their first change.
-> **Scope:** *how* Itala is built — the layering, the crate graph, the kernel and plugin design, the data model, and the key data flows. For *what* the product does, see the [functional contracts PRD](./prds/0001-functional-contracts.md); for *why* specific choices were made, see the [decision records](./adr/).
+> **Scope:** *how* Itala is built — the layering, the crate graph, the kernel and plugin design, the data model, and the key data flows. For *what* the product does, see the [roadmap](./ROADMAP.md) for milestone direction and the current-phase requirements in [`../SPEC.md`](../SPEC.md); for *why* specific choices were made, see the [decision records](./adr/).
 
 ## Status
 
-Itala is **greenfield with M0 landed**: the `itala-kernel` (shared types, event bus, VFS port, config registry, capability system, manifest model, durable `Kernel`), `itala-plugin-api` (versioned `Plugin`/`PluginContext` contract), `itala-plugin-host` (discovery, loading, crash-isolated lifecycle, capability enforcement + audit), and `itala-vfs-fs` (local-filesystem adapter with file watching) are implemented and verified end-to-end through the [M0 integration suite](./plans/m0-foundation.md). Bounded contexts (`itala-vault`, `itala-note`, `itala-graph`) and all shells are still unbuilt. This document remains the blueprint code is built and reviewed against; sections describing unbuilt parts are marked *(target)*. As code lands, this doc is updated to reflect *what is* rather than only *what is intended*. Phasing lives in the [roadmap](./ROADMAP.md); this doc is deliberately phasing-agnostic.
+Itala is **greenfield with M0 and M1 landed**: the `itala-kernel` (shared types, event bus, VFS port, config registry, capability policy, manifest model, durable `Kernel`, **history port**), `itala-plugin-api` (experimental `Plugin`/`PluginContext` contract), `itala-plugin-host` (discovery, loading, panic-contained lifecycle calls, capability checks + audit), `itala-vfs-fs` (local-filesystem adapter with file watching), **`itala-note`** (note data model, frontmatter parser), **`itala-vault`** (vault lifecycle, note CRUD, link rewriting, history integration), and **`itala-store-files`** (JSON-on-Vfs derived-state adapter, ADR-0004 §3) are implemented and verified end-to-end through the [M1 integration suite](../tasks/archive/2026-05-29-m1-vaults-notes/plan.md). The first shell — **`apps/itala-cli`** (clap+tokio, MVP-α) — is wired through every port. Bounded contexts still to land: the M2 document engine, `itala-graph` (M3), and search adapters (M4). CRDT evaluation is deferred until synchronization or collaboration requires it. This document remains the blueprint code is built and reviewed against; sections describing unbuilt parts are marked *(target)*. As code lands, this doc is updated to reflect *what is* rather than only *what is intended*. Phasing lives in the [roadmap](./ROADMAP.md); this doc is deliberately phasing-agnostic.
 
 ---
 
 ## 1. System overview
 
-Itala is a **hexagonal** (ports & adapters) system with a thin, non-replaceable **kernel** at the center, a set of independent **bounded contexts** built on it, **adapters** that implement ports for specific technologies, and **shells** that wire everything together for a platform. Alongside the core sits a **plugin host** that lets third-party code extend the system through a stable, versioned **plugin API**.
+Itala is a **hexagonal** (ports & adapters) system with a thin **kernel** at the center, a set of independent **bounded contexts** built on it, **adapters** that implement ports for specific technologies, and **shells** that wire everything together for a platform. The kernel, core bounded contexts, and plugin host form the non-replaceable framework. Their technology-specific adapters and extension surfaces are replaceable as their contracts mature. Alongside the core sits a **plugin host** that lets third-party code extend the system through an initially experimental, versioned **plugin API**.
 
 Two communication mechanisms are used, and only two:
 
-- **Direct trait calls** — for the performance-critical hot path (keystroke → CRDT → parse → render).
-- **Event bus** — for everything else: asynchronous, decoupled notifications between contexts and plugins (`NoteSaved → re-index`, `NoteRenamed → rewrite backlinks`).
+- **Direct trait and port calls** — for request/response work and durable operations, including the performance-critical hot path (keystroke → editing transaction → parse → render).
+- **Event bus** — for asynchronous, decoupled notifications between contexts and plugins (`NoteSaved → re-index`, `NoteRenamed → refresh backlinks`). Durable state never relies on an event being retained forever.
 
-Bounded contexts **never call each other directly**. They depend on the kernel and communicate with the rest of the system solely through events. This keeps the dependency graph a strict DAG and makes each context replaceable.
+Bounded contexts **never call each other directly**. They depend on the kernel and communicate with the rest of the system through events or shell-level orchestration against kernel ports. This keeps the dependency graph a strict DAG and lets each context evolve independently without claiming that core product semantics are third-party replaceable on day one.
 
 ```mermaid
 flowchart TB
@@ -28,28 +28,27 @@ flowchart TB
         Web["itala-web — WASM<br/>(post-MVP, target)"]
     end
 
-    subgraph Plugins["Plugins — sandboxed, replaceable"]
+    subgraph Plugins["Plugins — trusted native now; sandboxed WASM at M5"]
         direction LR
-        P1["Editor / Theme"]
-        P2["Storage / Sync"]
-        P3["Search / AI"]
-        P4["Exporter / Renderer"]
+        P1["Tool / Command"]
+        P2["Exporter / Renderer"]
+        P3["Future: Editor / Theme"]
+        P4["Future: Storage / Sync / Search / AI"]
     end
 
     subgraph Contexts["Bounded contexts — core, non-replaceable"]
         Vault["itala-vault"]
-        Note["itala-note<br/>(target)"]
+        Note["itala-note<br/>(shipped; document engine target)"]
         Graph["itala-graph<br/>(target)"]
     end
 
     subgraph Adapters["Adapters — replaceable ports & implementations"]
         VfsFs["itala-vfs-fs<br/>(local FS)"]
-        Yrs["Yrs CRDT"]
         Tantivy["Tantivy index"]
     end
 
     Kernel["<b>itala-kernel</b><br/>IDs · errors · event bus<br/>VFS port · config · capabilities"]
-    Host["itala-plugin-host<br/>+ itala-plugin-api (stable, versioned)"]
+    Host["itala-plugin-host<br/>+ itala-plugin-api (experimental, versioned)"]
 
     %% dependency direction: arrows point downward to what they depend on
     Shells --> Contexts
@@ -60,8 +59,8 @@ flowchart TB
     Host --> Kernel
     Plugins -.->|plugin API| Host
 
-    %% contexts talk to each other ONLY via the bus (lives in the kernel)
-    Contexts -.->|events only| Kernel
+    %% decoupled context notifications flow through the bus in the kernel
+    Contexts -.->|events| Kernel
 ```
 
 **Dependency rule:** arrows may only point *downward* in the diagram. Nothing depends on a shell; contexts depend only on the kernel; adapters depend only on the kernel's port traits; plugins depend only on the plugin API. This rule is enforced in review and is the single most important invariant in the codebase.
@@ -74,38 +73,40 @@ Itala is a single Cargo workspace (`members = ["crates/*", "apps/*"]`) with `uns
 
 ```text
 crates/
-  itala-kernel/          # non-replaceable core: types, event bus, VFS port, config, capabilities
-  itala-plugin-api/      # the stable, semver'd surface plugins compile against
-  itala-plugin-host/     # loads, sandboxes, lifecycle, capability enforcement
-  itala-vault/           # bounded context: vault management
-  itala-note/            # bounded context (target): note model, parsing, CRDT body
+  itala-kernel/          # non-replaceable core: types, event bus, VFS port, config, capabilities, history port
+  itala-plugin-api/      # versioned experimental surface; stability follows M5 proof
+  itala-plugin-host/     # native lifecycle/policy now; WASM sandbox target at M5
+  itala-vault/           # bounded context: vault management (shipped in M1)
+  itala-note/            # bounded context: canonical note model (shipped M1), document engine (M2 target)
+  itala-store-files/     # adapter: JSON-on-Vfs for derived-state ports (shipped in M1)
   itala-graph/           # bounded context (target): links, backlinks, mentions
-  itala-vfs-fs/          # adapter (target): local-filesystem VFS backend
+  itala-vfs-fs/          # adapter: local-filesystem VFS backend
 
 apps/
-  itala-cli/             # shell: CLI entry point (clap) — MVP-α
+  itala-cli/             # shell: CLI entry point (clap) — MVP-α (shipped in M1)
   itala-desktop/         # shell (target): Tauri — MVP-β
   itala-web/             # shell (target): WASM — post-MVP
 ```
 
 | Crate | Depends on | Depended on by | Responsibility |
 |-------|-----------|----------------|----------------|
-| `itala-kernel` | (external only) | everything | Shared primitives: ID/error types, the event bus, the VFS port trait, config registry, capability definitions, plugin manifest model, durable `Kernel` orchestrator. The only crate a context or adapter may import. |
-| `itala-plugin-api` | `itala-kernel` | plugins, `itala-plugin-host` | The versioned contract plugins see. Stable across minor versions; breaking changes bump the major and coexist. |
-| `itala-plugin-host` | `kernel`, `plugin-api` | shells | Plugin discovery, loading, sandboxing, lifecycle hooks, capability mediation, crash isolation. |
-| `itala-vault` *(target)* | `itala-kernel` | shells | Vault create/open/switch, note CRUD, link rewriting on move/rename, version history. |
-| `itala-note` *(target)* | `itala-kernel` | shells | Note data model, Markdown/frontmatter parsing, CRDT body. |
+| `itala-kernel` | (external only) | everything | Shared primitives: ID/error types, the event bus, the VFS port trait, config registry, capability definitions, plugin manifest model, durable `Kernel` orchestrator, **history port** (M1). The only crate a context or adapter may import. |
+| `itala-plugin-api` | `itala-kernel` | plugins, `itala-plugin-host` | The versioned contract plugins see. Experimental before the M5 extension surfaces are proven; its later compatibility policy is documented before declaring 1.0. |
+| `itala-plugin-host` | `kernel`, `plugin-api` | shells | Trusted native lifecycle and capability policy now; third-party WASM loading, sandboxing, and resource isolation at M5. |
+| `itala-vault` | `itala-kernel`, `itala-note` | shells | Vault create/open, note CRUD, link rewriting on move/rename, snapshot-on-save history integration. |
+| `itala-note` | `itala-kernel` | `itala-vault`, shells | Canonical Markdown note model and YAML frontmatter parsing; the M2 document engine adds parse, rendering, and editing transaction semantics. |
 | `itala-graph` *(target)* | `itala-kernel` | shells | Link index, backlinks, unlinked mentions. |
+| `itala-store-files` | `itala-kernel` | shells | JSON-on-Vfs adapter for derived-state ports (currently `DynHistoryStore`; grows with M3/M4). |
 | `itala-vfs-fs` | `itala-kernel` | shells | Local-filesystem VFS implementation + file watching. |
-| `itala-cli` *(target)* | contexts, adapters, host | (top-level binary) | `clap`-based CLI; the first shipped shell. |
+| `itala-cli` | contexts, adapters, host | (top-level binary) | `clap`-based CLI; the first shipped shell (MVP-α). |
 
-> **Where does new code go?** A shared primitive → `itala-kernel`. A user-visible capability that is core → a bounded context. A technology-specific implementation of a port → an adapter. A platform entry point → a shell under `apps/`. An extension third parties can ship independently → a plugin, against `itala-plugin-api` only.
+> **Where does new code go?** A shared primitive → `itala-kernel`. A user-visible capability required for the coherent first-party product → a bounded context. A technology-specific implementation of a port → an adapter. A platform entry point → a shell under `apps/`. A proven extension that third parties can ship independently → a plugin, against `itala-plugin-api` only.
 
 ---
 
 ## 3. The kernel
 
-The kernel is intentionally small and is the **only non-replaceable code** alongside the plugin host. It provides five things.
+The kernel is intentionally small. Together with the core bounded contexts and plugin host it forms the non-replaceable framework; the kernel itself provides five things.
 
 ### 3.1 Shared types
 
@@ -117,20 +118,22 @@ The kernel is intentionally small and is the **only non-replaceable code** along
 
 ### 3.2 Event bus
 
-The bus is the **only** cross-context communication channel. It is an in-process, typed pub/sub with **at-least-once delivery**; handlers must therefore be idempotent. Events are async; the hot path does not round-trip through the bus.
+The bus is the default decoupled cross-context notification channel. It is an in-process, typed pub/sub backed by bounded broadcast queues. Delivery is **best effort to active subscribers**: a subscriber that falls behind receives an explicit lag error and must reconcile from canonical Markdown or durable state. Events are not a durable log and are not described as at-least-once. Handlers remain idempotent because duplicate notifications and rebuilds are valid. Events are async; the hot path does not round-trip through the bus. [ADR-0007](./adr/0007-best-effort-event-delivery.md) defines this contract.
 
-Representative events *(target — exact names stabilize as M0 lands)*:
+Representative events *(the enum is non-exhaustive and grows with milestones)*:
 
 | Event | Emitted by | Reacted to by |
 |-------|-----------|---------------|
 | `VaultOpened` | vault | all contexts (warm caches) |
 | `NoteSaved { id }` | note | search adapter, graph |
 | `NoteChanged { id }` | note (editor hot path, debounced) | live views |
-| `NoteRenamed { from, to }` | vault | graph (link rewriting) |
+| `NoteRenamed { from, to }` | vault | graph (refresh derived link index) |
 | `NoteDeleted { id }` | vault | search, graph (eviction) |
 | `LinksUpdated { id }` | graph | live backlink panes |
 | `IndexRebuildRequested` | search/CLI | search adapter |
 | `PluginLoaded { id }` | plugin host | contexts that requested a capability |
+| `ConfigChanged { key }` | config registry | live views, plugins with config-driven behavior |
+| `StorageChanged { domain, backend }` | shell (vault-open wiring) | contexts that hold a storage backend (schedule vault reopen; see [ADR-0004](./adr/0004-derived-state-storage-strategy.md)) |
 
 ### 3.3 VFS port
 
@@ -159,47 +162,49 @@ A typed, layered config store (defaults → vault `.itala/` config → runtime o
 
 ### 3.5 Capability system
 
-The capability system is what makes plugins safe. A capability is a named, revocable grant (e.g., `vault.read`, `vault.write`, `network.outbound`, `search.index`, `ui.panel`). Plugins **declare** required capabilities in their manifest; the user **grants** them; the host **enforces** them at every privileged call and records usage in an audit log. This is detailed in [§4.4](#44-capabilities--permissions).
+The capability system defines which host operations a plugin may request. A capability is a named, revocable grant (e.g., `vault.read`, `vault.write`, `network.outbound`, `search.index`, `ui.panel`). Plugins **declare** required capabilities in their manifest; the user **grants** them; the host checks every privileged host call and records usage in an audit log. These checks become a security boundary when combined with the M5 WASM runtime's lack of ambient authority; for trusted native components they remain policy and audit. This is detailed in [§4.4](#44-capabilities--permissions) and [ADR-0005](./adr/0005-plugin-trust-and-rollout.md).
 
 ---
 
 ## 4. Plugin system
 
-Plugins are Itala's defining feature: every non-core capability — editors, themes, storage backends, sync transports, search engines, AI providers, exporters, renderers — is a plugin. The core is a thin orchestration layer; plugins compose the actual experience.
+Extensibility is a defining feature, but a usable first-party product comes first. Core bounded contexts provide stable product semantics; adapters provide technology-specific implementations; plugins expose proven extension surfaces. Initial third-party surfaces in M5 are WASM tools, commands, exporters, and renderers. Alternative editors, themes, storage backends, sync transports, search engines, AI providers, and additional runtimes remain long-term surfaces rather than promises that every internal interface is already public API.
 
 ### 4.1 Plugin types
 
-| Type | Description |
-|---|---|
-| Editor | Extends or replaces the note editor (e.g., Vim mode, WYSIWYG). |
-| Theme | CSS custom properties and styling rules. |
-| Storage | Implements a VFS backend (local, S3, IndexedDB, WebDAV). |
-| Sync | Provides a sync transport and conflict resolver. |
-| Search | Implements the search index and query interface (full-text, semantic). |
-| AI Provider | Implements the LLM/embedding provider trait. |
-| Exporter | Adds new export formats or templates. |
-| Command | Adds CLI subcommands or command-palette actions. |
-| Renderer | Custom inline or block rendering (e.g., Dataview queries). |
+| Type | Rollout | Description |
+|---|---|---|
+| Tool | M5 initial | Acts on notes through a deterministic input/output contract and later composes in Studio. |
+| Exporter | M5 initial | Adds new export formats or templates. |
+| Command | M5 initial | Adds CLI subcommands or command-palette actions. |
+| Renderer | M5 initial | Adds custom inline or block rendering with explicit accessibility metadata. |
+| Editor | Future | Extends or replaces the note editor after the desktop contract is proven. |
+| Theme | Future | Supplies constrained visual tokens and styling rules. |
+| Storage | Future | Implements a VFS backend (local, S3, IndexedDB, WebDAV). |
+| Sync | Future | Provides a sync transport and conflict resolver. |
+| Search | Future | Implements the search index and query interface (full-text, semantic). |
+| AI Provider | Future | Implements the LLM/embedding provider trait. |
 
 ### 4.2 Manifest & lifecycle
 
-Each plugin ships a `plugin.toml` manifest declaring its ID, version, API-compatibility range, required capabilities, and provided types. The host drives a fixed lifecycle — **initialize → activate → (config-change) → deactivate** — and guarantees that a failing plugin does not crash the host (crash isolation).
+Each plugin ships a `plugin.toml` manifest declaring its ID, version, API-compatibility range, required capabilities, and provided types. The host drives a fixed lifecycle — **initialize → activate → (config-change) → deactivate**. Native M0 lifecycle panics are caught at host call boundaries so ordinary failures do not terminate the process, but native code remains trusted and cannot be isolated from arbitrary process corruption. WASM plugins provide the stronger M5 isolation boundary.
 
-Plugins may be written in:
-- **Rust** (native, compiled) — fastest, for performance-critical types;
-- **WebAssembly** (portable, sandboxed) — the default for third-party code;
-- **Scripting** (Lua/Rhai) — for lightweight, embeddable extensions.
+Plugin runtime policy is deliberately narrow:
+- **Trusted native Rust** — compile-time-registered first-party components used by M0–M4. Capability checks provide policy and audit, not a security sandbox.
+- **WebAssembly components** — the M5 runtime and default for third-party code, portable and denied ambient authority.
+- **Additional native or scripting runtimes** — future options only if concrete use cases justify their larger trust and maintenance surface.
 
 ### 4.3 Sandboxing & ABI *(target)*
 
-WASM plugins run with no host access except through granted capabilities — no filesystem, no network, no ambient process. The host/guest boundary is the versioned plugin ABI; the `plugin-api` crate is the Rust-side projection of that ABI. Breaking ABI changes bump the major version and coexist side-by-side so old plugins keep loading.
+WASM plugins run with no host access except through granted capabilities — no ambient filesystem, network, or process access. The host/guest boundary is a versioned component contract; the `plugin-api` crate informs its Rust-side projection. Compatibility is experimental until the initial M5 surfaces have multiple real implementations. A concrete compatibility and deprecation policy is required before plugin API 1.0; indefinite side-by-side support for every historical ABI is not assumed.
 
 ### 4.4 Capabilities & permissions
 
 - Plugins **declare** required capabilities in `plugin.toml`.
 - Users **grant** capabilities at install (and can revoke later).
 - The host **mediates** every privileged call and **audits** usage.
-- A remote kill switch can revoke compromised plugin versions via the community hub.
+- These checks form a security boundary only for runtimes, such as WASM, that cannot bypass the host. For trusted native plugins they are policy and observability controls.
+- A future registry may distribute signed revocation advisories for compromised versions; automatic remote disabling is not part of the initial extension system.
 
 ### 4.5 Inter-plugin communication
 
@@ -213,11 +218,11 @@ WASM plugins run with no host access except through granted capabilities — no 
 
 ### 5.1 Entities
 
-- **Note:** `ULID` identifier · canonical `VfsPath` · frontmatter (`YAML`) · CRDT body · timestamps (created/updated) · `BLAKE3` checksum.
+- **Note:** `ULID` identifier · canonical `VfsPath` · frontmatter (`YAML`) · Markdown body · timestamps (created/updated) · `BLAKE3` checksum.
 - **Link:** source note · target (note id | URL | block ref) · link type · source position · display text.
 - **Vault:** root URI · configuration · installed-plugins list.
 
-Invariants: a note's checksum is recomputed on every persisted change; the CRDT body is the source of truth for content, while the on-disk Markdown is a deterministic projection of it (see [§6.2](#62-save--index)). Frontmatter is authoritative for metadata; the body is authoritative for prose.
+Invariants: the persisted Markdown file is the canonical source of truth. A note's checksum is recomputed on every persisted change; frontmatter is authoritative for metadata and the Markdown body is authoritative for prose. Parsed syntax trees, editor transactions, indexes, recovery journals, and any future CRDT state are subordinate working or derived representations. They must reconcile with external file edits and project accepted changes back to Markdown (see [§6.2](#62-save--index) and [ADR-0006](./adr/0006-markdown-canonical-source.md)).
 
 ### 5.2 On-disk layout
 
@@ -237,7 +242,12 @@ my-vault/
 └── Assets/
 ```
 
-Everything under `.itala/` is **derivable from user content** and can be deleted and rebuilt. This is the recoverability story for index corruption.
+The contents of `.itala/` have two durability classes:
+
+- **Rebuildable derived state** — search indexes, graph indexes, caches, and other projections may be deleted and rebuilt from canonical Markdown.
+- **Durable application state** — configuration, capability grants, plugin installation records, local history, and recovery journals are not reconstructable from current note content and must be backed up or migrated safely.
+
+Corruption recovery may discard only the rebuildable class automatically. The application must never describe all of `.itala/` as disposable.
 
 ---
 
@@ -251,25 +261,25 @@ Everything under `.itala/` is **derivable from user content** and can be deleted
 4. Contexts (vault, note, graph) are constructed with the VFS and bus, and subscribe to events.
 5. The plugin host scans `.itala` for installed plugins, verifies manifests, loads and activates each.
 6. The bus emits `VaultOpened`; contexts warm caches; the shell presents the surface.
-7. Durability: a graceful shutdown flushes CRDT state and the index so the next start resumes without loss.
+7. Durability: a graceful shutdown flushes pending Markdown writes, durable application state, and rebuildable indexes so the next start resumes consistently.
 
 ### 6.2 Save → index
 
-1. Editor applies the change to the CRDT body (synchronous, on the hot path).
-2. The note context debounces and persists the canonical Markdown projection to the VFS, recomputing the `BLAKE3` checksum.
+1. The writing surface applies an editing transaction to the in-memory document model (synchronous, on the hot path).
+2. The note context debounces and persists canonical Markdown to the VFS, recomputing the `BLAKE3` checksum. External file changes are reconciled explicitly rather than silently overwritten.
 3. `NoteSaved { id }` is published on the bus.
 4. The search adapter re-indexes the note; the graph context refreshes links and emits `LinksUpdated`.
 5. Live views (backlink pane, search) update reactively.
 
 ### 6.3 Rename → link propagation
 
-1. The vault context moves the file via `Vfs::rename` and updates canonical paths.
-2. `NoteRenamed { from, to }` is published.
-3. The graph context finds every referring note and rewrites its `[[links]]` through the VFS, then republishes `LinksUpdated` for each affected note.
+1. The vault context determines affected references, moves the file via `Vfs::rename`, rewrites canonical `[[links]]`, and records history through durable ports. Failure handling must leave the operation recoverable rather than relying on a later event.
+2. After the durable mutation completes, `NoteRenamed { from, to }` is published.
+3. The graph context refreshes its derived index and publishes `LinksUpdated`. If it misses or lags the event, it reconciles from canonical Markdown.
 
 ### 6.4 Keystroke → render (hot path)
 
-This path stays **off** the event bus to meet the < 16 ms budget (see [§8](#8-design-targets)): editor input → local CRDT apply → re-parse → re-render, all direct trait calls. A debounced `NoteChanged` is published afterward so asynchronous consumers eventually catch up.
+This path stays **off** the event bus to meet the < 16 ms budget (see [§8](#8-design-targets)): editor input → editing transaction → incremental parse → render, all direct trait calls. A debounced `NoteChanged` is published afterward; asynchronous consumers that lag reconcile from the latest canonical content.
 
 ---
 
@@ -301,13 +311,13 @@ This path stays **off** the event bus to meet the < 16 ms budget (see [§8](#8-d
 
 ### 7.5 Internationalization & accessibility (architectural implications)
 
-These are product requirements ([PRD §10](./prds/0001-functional-contracts.md#10-accessibility)), but they carry architectural consequences worth stating here: all user-facing strings flow through **Fluent** (`.ftl`) — no hard-coded UI strings in contexts — and the plugin renderer contract exposes accessibility metadata (roles, labels) so extensions stay screen-reader compatible.
+These are product requirements (see [ROADMAP.md](./ROADMAP.md)), but they carry architectural consequences worth stating here: all user-facing strings flow through **Fluent** (`.ftl`) — no hard-coded UI strings in contexts — and the plugin renderer contract exposes accessibility metadata (roles, labels) so extensions stay screen-reader compatible.
 
 ---
 
 ## 8. Design targets
 
-These budgets drive architectural choices; they are not acceptance criteria (those live in PRDs). Detail and measurement plans belong in per-area PRDs.
+These budgets drive architectural choices; they are not acceptance criteria (those live in the phase SPEC.md). Detail and measurement plans belong in the phase SPEC.md.
 
 | Dimension | Target |
 |-----------|--------|
@@ -315,11 +325,11 @@ These budgets drive architectural choices; they are not acceptance criteria (tho
 | Open a 10 KB note | < 50 ms |
 | Full-text search, 10 000 notes | < 200 ms |
 | Editor scrolling | 60 fps on large documents |
-| Keystroke → screen | < 16 ms (incl. CRDT + parse) |
+| Keystroke → screen | < 16 ms (incl. editing transaction + parse) |
 | Kernel memory | < 20 MB resident |
-| Per-plugin memory | within a declared budget, enforced |
+| Per-plugin memory | first-party components observed; WASM plugins constrained to a declared budget at M5 |
 
-**Reliability posture:** all operations work offline; index corruption is recoverable by full rebuild (everything under `.itala/` is derivable); unsaved changes survive crashes via local CRDT state; event delivery is at-least-once with idempotent handlers.
+**Reliability posture:** all operations work offline; index and graph corruption is recoverable by rebuilding their derived state; durable `.itala/` state is backed up and migrated rather than discarded; the desktop target preserves unsaved changes through a recovery journal; bounded event delivery is best effort with explicit lag detection and reconciliation; handlers are idempotent.
 
 ---
 
@@ -342,15 +352,16 @@ The same kernel logic runs everywhere; shells and adapters adapt to platform cap
 ### 10.1 Trust boundaries
 
 - The user trusts the Itala core and built-in plugins.
-- Third-party plugins run with **limited, user-granted capabilities**.
-- The community hub is a distribution channel; plugins are **signed** and can be **revoked**.
+- M0–M4 native plugins are trusted first-party code; capability checks do not sandbox them.
+- M5 third-party WASM plugins run with **limited, user-granted capabilities** and no ambient authority.
+- The initial curated index verifies signed packages. A future registry may publish revocation advisories.
 - Cloud sync and AI providers receive only data the user explicitly chooses to share.
 
 ### 10.2 Mitigations
 
-- **Plugin sandboxing:** WASM plugins have no host access except through granted capabilities.
-- **Capability system:** plugins declare permissions; the host enforces at runtime and audits usage.
-- **Signed plugins:** prevent tampering; enable revocation.
+- **Plugin sandboxing:** third-party WASM plugins have no host access except through granted capabilities; native plugins are never presented as sandboxed.
+- **Capability system:** plugins declare permissions; the host checks and audits host-service usage. WASM's lack of ambient authority makes those checks enforceable for third-party code.
+- **Signed plugins:** verify publisher/package integrity; future revocation advisories can identify compromised versions.
 - **User consent:** every network-bound feature is opt-in with clear disclosure of data flows.
 - **Encryption:** optional at-rest vault encryption (**XChaCha20-Poly1305**); **TLS 1.3** minimum for all network traffic.
 - **CSP** enforced in web contexts.
@@ -360,13 +371,13 @@ The same kernel logic runs everywhere; shells and adapters adapt to platform cap
 
 - All user data remains local by default.
 - Cloud sync and AI features require explicit opt-in.
-- AI prompts are redacted of sensitive identifiers before transmission.
+- AI providers receive only the notes or selections the user explicitly submits; the UI previews the scope before transmission.
 - No user content is sent to telemetry or analytics without consent.
 
 ### 10.4 Out of scope
 
 - Protection against a compromised operating system or kernel-level malware.
-- Formal verification of plugin behavior — the capability system limits blast radius but cannot guarantee absence of logic errors.
+- Formal verification of plugin behavior — WASM capabilities limit ambient authority but cannot guarantee the absence of logic errors.
 - Regulatory compliance (GDPR, HIPAA) is the user's responsibility; Itala provides data-control tools but is not a certified compliance solution.
 
 ---
@@ -377,7 +388,7 @@ The same kernel logic runs everywhere; shells and adapters adapt to platform cap
 |----------|--------|
 | What problem does Itala solve? | [VISION.md](./VISION.md) |
 | What is being built and when? | [ROADMAP.md](./ROADMAP.md) |
-| What does the product do (requirements)? | [prds/](./prds/) |
+| What does the product do (current-phase requirements)? | [SPEC.md](../SPEC.md) (root) |
 | Why were specific choices made? | [adr/](./adr/) |
 | How is it built? (this doc) | [ARCHITECTURE.md](./ARCHITECTURE.md) |
 

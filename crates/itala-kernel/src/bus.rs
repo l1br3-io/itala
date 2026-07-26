@@ -1,10 +1,14 @@
 //! The [`EventBus`] — an in-process, typed pub/sub built on
 //! `tokio::sync::broadcast`.
 //!
-//! Delivery is **at-least-once**: handlers must be idempotent. The channel is
-//! bounded (capacity ≥ 1024 by default); a slow subscriber that falls behind
-//! the buffer window observes a [`Lagged`](tokio::sync::broadcast::error::RecvError::Lagged)
-//! error and must resync. The hot path (keystroke → CRDT → render) never goes
+//! Delivery is **best-effort to active subscribers** (see
+//! [ADR-0007](../../../docs/adr/0007-best-effort-event-delivery.md)): the
+//! channel is bounded (capacity ≥ 1024 by default), and a slow subscriber that
+//! falls behind the buffer window observes a
+//! [`Lagged`](tokio::sync::broadcast::error::RecvError::Lagged) condition and
+//! must reconcile from canonical state. Events are notifications, not a durable
+//! log; handlers must be idempotent (duplicate notifications and rebuilds are
+//! valid). The hot path (keystroke → editing transaction → render) never goes
 //! through the bus.
 //!
 //! Shutdown is driven externally via a `CancellationToken` (from `tokio-util`);

@@ -1,9 +1,9 @@
 //! F16 — End-to-end M0 integration suite.
 //!
 //! Exercises the full M0 contract: construct kernel → open VFS → register
-//! config → load plugins → enforce capabilities → crash isolation → event flow
-//! → graceful shutdown → restart → state preserved. The durability scenarios
-//! run against a real [`LocalFsVfs`]; the in-memory scenarios use
+//! config → load plugins → apply capability policy → panic containment →
+//! event flow → graceful shutdown → restart → state preserved. The durability
+//! scenarios run against a real [`LocalFsVfs`]; the in-memory scenarios use
 //! [`MemoryVfs`] for speed and determinism.
 
 use std::sync::Arc;

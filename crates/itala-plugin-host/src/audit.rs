@@ -1,4 +1,4 @@
-//! Audit logging for capability enforcement.
+//! Audit logging for capability policy decisions.
 //!
 //! Every capability grant, use, and denial is emitted as a structured
 //! `tracing` event under the `itala.plugin.audit` target, and each privileged

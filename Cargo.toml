@@ -1,7 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*"]
-# `apps/*` re-joins when the first shell (itala-cli, MVP-α) lands.
+members = ["crates/*", "apps/*"]
 
 [workspace.package]
 edition = "2024"
@@ -38,8 +37,10 @@ assert_cmd    = "2"
 predicates    = "3"
 toml          = "0.9"
 semver        = { version = "1", features = ["serde"] }
-itala-kernel   = { path = "crates/itala-kernel" }
-itala-vault    = { path = "crates/itala-vault" }
+itala-kernel      = { path = "crates/itala-kernel" }
+itala-vault       = { path = "crates/itala-vault" }
+itala-note        = { path = "crates/itala-note" }
+itala-store-files = { path = "crates/itala-store-files" }
 itala-plugin-api  = { path = "crates/itala-plugin-api" }
 itala-plugin-host = { path = "crates/itala-plugin-host" }
 itala-vfs-fs      = { path = "crates/itala-vfs-fs" }

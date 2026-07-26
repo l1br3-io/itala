@@ -2,9 +2,13 @@
 //!
 //! A [`Capability`] is a named, revocable grant (e.g. `vault.read`,
 //! `network.outbound`, `search.index`). Plugins *declare* required
-//! capabilities in their manifest; the user *grants* them; the host
-//! *enforces* them at every privileged call. The [`CapabilityRegistry`]
-//! tracks granted capabilities per plugin and is queryable at runtime.
+//! capabilities in their manifest; the user *grants* them; the host applies
+//! them as **policy and audit** at privileged calls routed through
+//! `PluginContext` — not a security sandbox for native code (see
+//! [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)). WASM at M5
+//! makes these checks enforceable for third-party code. The
+//! [`CapabilityRegistry`] tracks granted capabilities per plugin and is
+//! queryable at runtime.
 //!
 //! The serialization form of [`Capability`] is a bare TOML/JSON string —
 //! this is a semver-frozen surface: the string *is* the capability, so it
@@ -92,6 +96,36 @@ impl Capability {
     #[must_use]
     pub fn vault_read() -> Self {
         Self::new(known::VAULT_READ)
+    }
+
+    /// Convenience constructor for the well-known `vault.write` capability.
+    #[must_use]
+    pub fn vault_write() -> Self {
+        Self::new(known::VAULT_WRITE)
+    }
+
+    /// Convenience constructor for the well-known `network.outbound` capability.
+    #[must_use]
+    pub fn network_outbound() -> Self {
+        Self::new(known::NETWORK_OUTBOUND)
+    }
+
+    /// Convenience constructor for the well-known `search.index` capability.
+    #[must_use]
+    pub fn search_index() -> Self {
+        Self::new(known::SEARCH_INDEX)
+    }
+
+    /// Convenience constructor for the well-known `ui.panel` capability.
+    #[must_use]
+    pub fn ui_panel() -> Self {
+        Self::new(known::UI_PANEL)
+    }
+
+    /// Convenience constructor for the well-known `telemetry.report` capability.
+    #[must_use]
+    pub fn telemetry_report() -> Self {
+        Self::new(known::TELEMETRY_REPORT)
     }
 }
 

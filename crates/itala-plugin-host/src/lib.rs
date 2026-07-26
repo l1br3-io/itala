@@ -1,10 +1,16 @@
-//! Discovery, loading, lifecycle, capability enforcement, and crash isolation
-//! for Itala plugins.
+//! Discovery, loading, lifecycle, capability policy/audit, and panic
+//! containment for Itala plugins.
 //!
 //! The host scans directories for `plugin.toml` manifests, verifies API-range
 //! compatibility, drives the `initialize → activate → deactivate` lifecycle,
-//! mediates every privileged call through the [`itala_kernel`] capability
-//! registry, and guarantees that a panicking plugin never crashes the host.
+//! applies the capability policy/audit check to privileged calls routed
+//! through `PluginContext`, and contains ordinary lifecycle-task panics.
+//! Native M0 plugins are trusted in-process components: the capability checks
+//! here are policy and audit, **not** a security sandbox, and panic
+//! containment is resilience to ordinary bugs rather than isolation of
+//! malicious code. WASM at M5 will make both guarantees enforceable for
+//! third-party code (see
+//! [ADR-0005](../../docs/adr/0005-plugin-trust-and-rollout.md)).
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

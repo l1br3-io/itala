@@ -1,7 +1,9 @@
 # ADR-0002 — Rust-native plugins for M0, WASM deferred to M5
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0005](./0005-plugin-trust-and-rollout.md)
 - **Date:** 2026-07-11
+
+> **Superseded:** This record's description of native capability checks as a sandbox is incorrect. Native M0 plugins are trusted in-process components; [ADR-0005](./0005-plugin-trust-and-rollout.md) defines the corrected trust model while retaining the native-first rollout.
 
 ## Context
 

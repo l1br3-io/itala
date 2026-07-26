@@ -1,7 +1,7 @@
 //! Checkpoint B — the plugin host proven end to end.
 //!
 //! Loads three plugins (one of which panics during activation), verifies the
-//! host survives, capability enforcement works on the survivors, and the
+//! host survives, capability policy/audit works on the survivors, and the
 //! lifecycle runs `initialize → activate → deactivate` in order.
 
 use std::sync::Arc;
@@ -85,7 +85,7 @@ fn manifest_toml(id: &str, caps: &[&str]) -> String {
 }
 
 #[tokio::test]
-async fn checkpoint_b_host_survives_crash_and_enforces_capabilities() {
+async fn checkpoint_b_host_survives_crash_and_applies_capability_policy() {
     let bus = EventBus::new();
     let caps = Arc::new(CapabilityRegistry::new());
     let vfs: Arc<dyn DynVfs> = Arc::from(into_dyn(MemoryVfs::new()));
@@ -144,7 +144,7 @@ async fn checkpoint_b_host_survives_crash_and_enforces_capabilities() {
             .any(|(id, s)| id.as_str() == "bystander" && s.is_active())
     );
 
-    // capability enforcement: reader can read, bystander cannot
+    // capability policy: reader can read, bystander cannot
     let reader_ctx = host.context_for(&"reader".into()).unwrap();
     let bystander_ctx = host.context_for(&"bystander".into()).unwrap();
     let bytes = reader_ctx

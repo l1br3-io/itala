@@ -1,8 +1,14 @@
 //! [`PluginContext`] — the host-provided handle plugins use at runtime.
 //!
-//! Every privileged call goes through the context, which checks the plugin's
-//! granted capabilities before delegating to the host. A plugin that lacks a
-//! capability receives [`itala_kernel::Error::CapabilityDenied`].
+//! Every privileged call that uses this context is checked against the
+//! plugin's granted capabilities before delegating to the host; a plugin
+//! lacking a capability receives [`itala_kernel::Error::CapabilityDenied`].
+//!
+//! This is a **policy and audit** choke point, not a security boundary
+//! (see [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)):
+//! trusted native plugins retain ambient host authority and can bypass the
+//! context. WASM components at M5 will make the same checks enforceable
+//! because they have no ambient authority.
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -12,9 +18,13 @@ use itala_kernel::{PluginId, Result};
 
 /// Host-provided runtime handle for a single plugin.
 ///
-/// The host constructs one `PluginContext` per plugin and enforces capability
-/// checks on each method. Plugins never receive ambient host access — only
-/// what the context exposes.
+/// The host constructs one `PluginContext` per plugin and applies the
+/// capability policy/audit check on each method. Plugins are *expected* to
+/// route every privileged operation through this context; native plugins,
+/// however, retain ambient host authority and can bypass it (see
+/// [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)). The M5
+/// WASM runtime removes that ambient authority, making the context
+/// enforceable for third-party code.
 #[async_trait]
 pub trait PluginContext: Send + Sync {
     /// Returns the id of the plugin this context belongs to.

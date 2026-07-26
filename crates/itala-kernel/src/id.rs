@@ -175,6 +175,59 @@ impl LinkId {
     }
 }
 
+/// Uniquely identifies a snapshot in a [`HistoryStore`](crate::history::HistoryStore).
+///
+/// ULID-backed. See [`NoteId`] for round-trip semantics.
+///
+/// ```
+/// use std::str::FromStr;
+/// use itala_kernel::HistoryId;
+///
+/// let id = HistoryId::new();
+/// let back = HistoryId::from_str(&id.to_string()).unwrap();
+/// assert_eq!(id, back);
+/// ```
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Default,
+    Serialize,
+    Deserialize,
+    Display,
+    From,
+    Into,
+    FromStr,
+)]
+#[serde(transparent)]
+#[repr(transparent)]
+pub struct HistoryId(pub Ulid);
+
+impl HistoryId {
+    /// Creates a new, randomly-generated identifier.
+    #[must_use]
+    pub fn new() -> Self {
+        Self(Ulid::new())
+    }
+
+    /// Creates an identifier from an existing [`Ulid`].
+    #[must_use]
+    pub const fn from_ulid(id: Ulid) -> Self {
+        Self(id)
+    }
+
+    /// Returns the underlying [`Ulid`].
+    #[must_use]
+    pub const fn ulid(&self) -> Ulid {
+        self.0
+    }
+}
+
 /// Identifies a block reference target within a note
 /// (e.g. the `block-id` in `[[Note#^block-id]]`).
 ///
@@ -303,10 +356,11 @@ const _: () = {
     const LINK_ID: fn() = check::<LinkId>;
     const BLOCK_ID: fn() = check::<BlockId>;
     const PLUGIN_ID: fn() = check::<PluginId>;
+    const HISTORY_ID: fn() = check::<HistoryId>;
 
     // Silence unused-constant warnings while keeping them compile-time-evaluated.
     const _: [(); 0] = [(); {
-        let _ = (NOTE_ID, VAULT_ID, LINK_ID, BLOCK_ID, PLUGIN_ID);
+        let _ = (NOTE_ID, VAULT_ID, LINK_ID, BLOCK_ID, PLUGIN_ID, HISTORY_ID);
         0
     }];
 };

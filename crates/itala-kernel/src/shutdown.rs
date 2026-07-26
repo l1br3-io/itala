@@ -37,20 +37,25 @@ pub struct Kernel {
 impl Kernel {
     /// Creates a new kernel over the given VFS. Does not load persisted state;
     /// call [`Kernel::start`] for that.
+    ///
+    /// A fresh event bus is constructed internally. To share a bus with other
+    /// components (e.g. the plugin host), use [`Kernel::with_bus`].
     #[must_use]
     pub fn new(vfs: Arc<dyn DynVfs>) -> Self {
-        Self::with_capacity(vfs, EventBus::new())
+        Self::with_bus(vfs, EventBus::new())
     }
 
-    /// Creates a kernel with an explicit event bus (useful when other
-    /// components need to subscribe before construction completes).
+    /// Creates a kernel with an explicit event bus, shared with other
+    /// components (e.g. the plugin host). The bus is also wired into the
+    /// [`ConfigRegistry`] so that config changes publish
+    /// [`crate::KernelEvent::ConfigChanged`].
     #[must_use]
-    pub fn with_capacity(vfs: Arc<dyn DynVfs>, bus: EventBus) -> Self {
+    pub fn with_bus(vfs: Arc<dyn DynVfs>, bus: EventBus) -> Self {
         Self {
-            bus,
-            config: ConfigRegistry::new(),
+            config: ConfigRegistry::with_bus(bus.clone()),
             caps: Arc::new(CapabilityRegistry::new()),
             vfs,
+            bus,
             shutdown: CancellationToken::new(),
             installed_plugins: Vec::new(),
         }
@@ -145,6 +150,7 @@ impl Kernel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::KernelEvent;
     use crate::test_support::MemoryVfs;
     use crate::vfs::into_dyn;
     use crate::{PluginId, manifest::PluginType};
@@ -219,5 +225,35 @@ mod tests {
         let vfs2: Arc<dyn DynVfs> = Arc::from(into_dyn(MemoryVfs::new()));
         let mut again = Kernel::new(vfs2);
         again.start().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn config_changes_publish_on_kernel_bus() {
+        // Regression: Kernel::new previously created ConfigRegistry without a
+        // bus, so set_override never published ConfigChanged on the kernel's
+        // bus. The bus must be wired through.
+        let vfs: Arc<dyn DynVfs> = Arc::from(into_dyn(MemoryVfs::new()));
+        let mut sub = {
+            let bus = EventBus::new();
+            let sub = bus.subscribe();
+            let mut kernel = Kernel::with_bus(Arc::clone(&vfs), bus);
+            kernel
+                .config_mut()
+                .register(crate::config::schema::ConfigSchema::new(
+                    "ui.theme",
+                    toml::Value::String("dark".into()),
+                    "theme",
+                ));
+            kernel
+                .config_mut()
+                .set_override("ui.theme", &"light")
+                .unwrap();
+            sub
+        };
+
+        match sub.recv().await.unwrap() {
+            KernelEvent::ConfigChanged { key } => assert_eq!(key, "ui.theme"),
+            other => panic!("expected ConfigChanged, got {other:?}"),
+        }
     }
 }

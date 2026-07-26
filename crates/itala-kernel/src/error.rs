@@ -75,8 +75,12 @@ pub enum Error {
     #[error("path escapes vfs root: {0}")]
     PathEscape(String),
 
-    /// A plugin panicked or otherwise crashed and was isolated.
-    #[error("plugin '{0}' crashed and was isolated")]
+    /// A plugin's lifecycle task panicked and was deactivated. This fires on
+    /// `JoinError::is_panic()` from a spawned lifecycle call (`initialize`,
+    /// `activate`, or `deactivate`); it is **not** a security boundary —
+    /// native code retains ambient authority and can bypass host policy
+    /// (see [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)).
+    #[error("plugin '{0}' crashed during a lifecycle task and was deactivated")]
     PluginCrashed(PluginId),
 
     /// A note-level operation failed (e.g. conflicting note, invalid note

@@ -1,8 +1,12 @@
-//! Lifecycle data structures and isolated execution helpers.
+//! Lifecycle data structures and panic-containment helpers.
 //!
-//! Each lifecycle method runs inside its own `tokio::task` so a panicking
-//! plugin is caught (the [`JoinError`] is mapped to
-//! [`Error::PluginCrashed`]) and the host keeps running.
+//! Each lifecycle method runs inside its own `tokio::task` so an ordinary
+//! panic in the plugin's `initialize` / `activate` / `deactivate` is caught
+//! (the [`JoinError`] is mapped to [`Error::PluginCrashed`]) and the host
+//! keeps running. This is best-effort resilience to ordinary bugs, **not** a
+//! security boundary — native plugins can still corrupt process state or
+//! call `abort()` (see
+//! [ADR-0005](../../../docs/adr/0005-plugin-trust-and-rollout.md)).
 
 use std::sync::Arc;
 
@@ -39,7 +43,7 @@ impl PluginStatus {
     }
 }
 
-/// Runs `plugin.initialize` under task isolation.
+/// Runs `plugin.initialize` under task-scoped panic containment.
 ///
 /// # Errors
 /// [`Error::PluginCrashed`] if the task panicked; otherwise the plugin's own
@@ -47,25 +51,25 @@ impl PluginStatus {
 pub async fn initialize(plugin: Arc<dyn Plugin>, ctx: HostContext) -> Result<()> {
     let id = plugin.id();
     let p = plugin.clone();
-    run_isolated(id, async move { p.initialize(&ctx).await }).await
+    run_with_panic_containment(id, async move { p.initialize(&ctx).await }).await
 }
 
-/// Runs `plugin.activate` under task isolation. See [`initialize`].
+/// Runs `plugin.activate` under task-scoped panic containment. See [`initialize`].
 pub async fn activate(plugin: Arc<dyn Plugin>, ctx: HostContext) -> Result<()> {
     let id = plugin.id();
     let p = plugin.clone();
-    run_isolated(id, async move { p.activate(&ctx).await }).await
+    run_with_panic_containment(id, async move { p.activate(&ctx).await }).await
 }
 
-/// Runs `plugin.deactivate` under task isolation. See [`initialize`].
+/// Runs `plugin.deactivate` under task-scoped panic containment. See [`initialize`].
 pub async fn deactivate(plugin: Arc<dyn Plugin>, ctx: HostContext) -> Result<()> {
     let id = plugin.id();
     let p = plugin.clone();
-    run_isolated(id, async move { p.deactivate(&ctx).await }).await
+    run_with_panic_containment(id, async move { p.deactivate(&ctx).await }).await
 }
 
 /// Spawns a future on the runtime and maps a panic to `PluginCrashed`.
-async fn run_isolated<F>(id: PluginId, fut: F) -> Result<()>
+async fn run_with_panic_containment<F>(id: PluginId, fut: F) -> Result<()>
 where
     F: std::future::Future<Output = Result<()>> + Send + 'static,
 {
