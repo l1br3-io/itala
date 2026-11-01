@@ -3,3 +3,8 @@
 
 # Active plan files — working documents only, not for version control
 .claude/plans/
+.zcode/plans/
+
+# Agentic spec/task working artifacts (see AGENTS.md)
+SPEC*.md
+/tasks

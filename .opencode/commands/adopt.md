@@ -67,6 +67,6 @@ diff first):
    loads once at startup), then in a new session verify the router is active:
    ask "what tech conventions should I load?" — the agent should cite the
    stacks from `.opencode/harness/rules/tech.md`.
-6. **Hand off.** Suggest `/spec` to define what to build, or `/planning` if a
+6. **Hand off.** Suggest `/spec` to define what to build, or `/plan` if a
    spec already exists. Run `python3 .opencode/harness/scripts/check-refs.py`
    if any `.md` was added or moved.

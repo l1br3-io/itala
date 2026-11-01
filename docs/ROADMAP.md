@@ -1,7 +1,7 @@
 # Roadmap
 
 > **Status:** Directional — no dates, no calendar. Product-level; implementation detail lives
-> in [`specs/m2-write-engine/spec.md`](./specs/m2-write-engine/spec.md) (current effort) and the [architecture doc](./ARCHITECTURE.md).
+> in the local `SPEC.md` working files (current effort, see AGENTS.md) and the [architecture doc](./ARCHITECTURE.md).
 
 Itala is a free, open-source **cross-platform knowledge management system**: durable content
 as plain Markdown you control, useful first-party capabilities behind explicit contracts, and
@@ -18,25 +18,27 @@ VISION   "What problem are we solving?"   docs/VISION.md
   │
 ROADMAP  "What directions / milestones?"  docs/ROADMAP.md  (this)
   │
-SPEC     "Current effort requirements"    docs/specs/<effort-slug>/spec.md
+SPEC     "Current effort requirements"    SPEC.md + SPEC-<module-id>.md (local, gitignored)
 ```
 
 Each effort ships through the harness lifecycle
 
 ```text
-DEFINE → /spec       spec-driven-development             → docs/specs/<slug>/spec.md (status: draft)
-PLAN   → /planning   planning-and-task-breakdown         → docs/specs/<slug>/{plan.md, todo.md, tasks/00N-*.md}
-BUILD  → /build      incremental-implementation + TDD    → source + tests (flips spec status: draft → active)
-VERIFY → /test       debugging-and-error-recovery        → pnpm verify green
+DEFINE → /spec       spec-driven-development             → SPEC.md (capability map) + SPEC-<id>.md (status: draft)
+PLAN   → /plan       planning-and-task-breakdown         → tasks/{plan.md, todo.md, <id>.md chunks}
+BUILD  → /build      incremental-implementation + TDD    → source + tests (per-task commits)
+VERIFY → /test       debugging-and-error-recovery        → just test green
 REVIEW → /review     code-review-and-quality             → sign-off
-SHIP   → /ship       shipping-and-launch                 → merge PR; spec status flips to shipped (dir stays in place)
+SHIP   → /ship       shipping-and-launch                 → merge PR (module marked done in SPEC.md)
 ```
 
-When an effort ships, its spec.md frontmatter flips to status: shipped
-with the merge date. The directory stays at docs/specs/<slug>/ forever —
-no archive step, no move. Git is the full history; the filesystem is the
-browsable index. The next effort starts on a fresh branch with a fresh
-docs/specs/<new-slug>/ directory.
+In ZCode the planning command is `/planning` — `/plan` is a reserved
+built-in there; opencode keeps `/plan`.
+
+Specs and task chunks are **local working artifacts** (`SPEC*.md`, `tasks/`),
+gitignored — never committed. Git is the full history of shipped code; the
+local SPEC files are the browsable index of the initiative in flight. The
+next effort starts with a fresh `/spec` run.
 
 ---
 
@@ -58,7 +60,7 @@ as a post-launch direction.
 
 ## Milestones
 
-**CURRENT MILESTONE: M2 — Write Engine** (draft spec in [`specs/m2-write-engine/spec.md`](./specs/m2-write-engine/spec.md)).
+**CURRENT MILESTONE: M2 — Write Engine** (requirements to be defined via `/spec` in the local `SPEC-*.md` working files).
 
 | # | Milestone | State |
 |---|-----------|-------|

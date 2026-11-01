@@ -50,8 +50,19 @@ Active stack: **rust**.
 ## Skill-Driven Execution
 
 This project runs on a **skill-driven model**: if a task matches a skill, use
-it. Skills live at `.opencode/skills/<name>/SKILL.md`. Don't implement directly when a
-skill applies; follow its workflow exactly — no partial application.
+it. Don't implement directly when a skill applies; follow its workflow exactly
+— no partial application.
+
+Skill locations (one canonical copy, symlinked per agent — mirrors the
+[addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) setup;
+`skills-lock.json` pins the upstream sources):
+
+| Asset | Path |
+|-------|------|
+| Canonical skills | `.agents/skills/<name>/SKILL.md` |
+| Shared checklists | `.agents/references/*.md` |
+| opencode (harness-adapted) | `.opencode/skills/<name>/SKILL.md` |
+| ZCode / Claude Code | `.zcode/skills/<name>`, `.claude/skills/<name>` → symlinks into `.agents/skills/` |
 
 ### Intent → Skill
 
@@ -63,6 +74,7 @@ skill applies; follow its workflow exactly — no partial application.
 | Code review | `code-review-and-quality` |
 | Refactor / simplification | `code-simplification` |
 | API / interface design | `api-and-interface-design` |
+| Rust code / review | `rust-best-practices` |
 | UI / frontend | `frontend-ui-engineering` |
 | Security hardening | `security-and-hardening` |
 | Docs / decisions | `documentation-and-adrs` |
@@ -71,17 +83,21 @@ More skills exist — reach for the matching one before inventing a process.
 
 ### Lifecycle
 
-The workflow maps to slash commands (this harness ships `.opencode/commands/`) and the
-skills behind them:
+The workflow maps to slash commands (this harness ships `.opencode/commands/`,
+mirrored to `.zcode/commands/` for ZCode) and the skills behind them:
 
 ```
 DEFINE → /spec        spec-driven-development
-PLAN   → /planning    planning-and-task-breakdown
+PLAN   → /plan        planning-and-task-breakdown
 BUILD  → /build       incremental-implementation + test-driven-development
 VERIFY → /test        debugging-and-error-recovery
 REVIEW → /review      code-review-and-quality
 SHIP   → /ship        shipping-and-launch
 ```
+
+In ZCode the planning command is `/planning` — `/plan` is a reserved
+built-in there, so its mirror is renamed to `planning.md`; opencode keeps
+`/plan`.
 
 ### Anti-rationalization
 
@@ -102,6 +118,24 @@ Three composable layers — different jobs, don't confuse them:
 - **Commands** (`.opencode/commands/*.md`) — slash entry points. The *when*. The orchestration layer.
 
 Composition rule: **the user (or a command) is the orchestrator. Agents do not invoke other agents.** An agent may invoke skills. The only multi-agent pattern this harness endorses is **parallel fan-out with a merge step** — used by `/ship`. See `.opencode/harness/rules/orchestration-patterns.md`.
+
+## Spec & task artifacts (local working docs)
+
+- `SPEC.md` is the master index: the capability map (module ids, dependency
+  direction, build order) and per-module status. Per-module specs live at
+  `SPEC-<module-id>.md`; per-module task chunks at `tasks/<module-id>.md`.
+  Global aggregates: `tasks/plan.md` and `tasks/todo.md`.
+- All of the above are local working artifacts, gitignored via `SPEC*.md`
+  and `/tasks`. Never commit them.
+- Module ids come from the capability map in `SPEC.md`, are chosen once, and
+  are never renamed mid-initiative.
+- Before implementing: read `SPEC.md` for orientation, then load the
+  module's `SPEC-<id>.md` and `tasks/<id>.md` chunk. Never implement a
+  module whose spec is not approved or whose chunk is not written.
+- `/build` consumes the chunk files; see `.opencode/commands/build.md`
+  (mirrored at `.zcode/commands/build.md`).
+- PRs must copy the module's success criteria into the PR body, since
+  reviewers cannot see the local spec files.
 
 ## Boundaries
 

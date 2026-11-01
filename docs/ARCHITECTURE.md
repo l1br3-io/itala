@@ -1,11 +1,11 @@
 # Architecture
 
 > **Audience:** a contributor about to make their first change.
-> **Scope:** *how* Itala is built — the layering, the crate graph, the kernel and plugin design, the data model, and the key data flows. For *what* the product does, see the [roadmap](./ROADMAP.md) for milestone direction and the current-effort requirements in [`./specs/m2-write-engine/spec.md`](./specs/m2-write-engine/spec.md); for *why* specific choices were made, see the [decision records](./adrs/).
+> **Scope:** *how* Itala is built — the layering, the crate graph, the kernel and plugin design, the data model, and the key data flows. For *what* the product does, see the [roadmap](./ROADMAP.md) for milestone direction; for *why* specific choices were made, see the [decision records](./adrs/).
 
 ## Status
 
-Itala is **greenfield with M0 and M1 landed**: the `itala-kernel` (shared types, event bus, VFS port, config registry, capability policy, manifest model, durable `Kernel`, **history port**), `itala-plugin-api` (experimental `Plugin`/`PluginContext` contract), `itala-plugin-host` (discovery, loading, panic-contained lifecycle calls, capability checks + audit), `itala-vfs-fs` (local-filesystem adapter with file watching), **`itala-note`** (note data model, frontmatter parser), **`itala-vault`** (vault lifecycle, note CRUD, link rewriting, history integration), and **`itala-store-files`** (JSON-on-Vfs derived-state adapter, ADR-0004 §3) are implemented and verified end-to-end through the [M1 integration suite](./specs/m1-vaults-notes/plan.md). The first shell — **`apps/itala-cli`** (clap+tokio, MVP-α) — is wired through every port. Bounded contexts still to land: the M2 document engine, `itala-graph` (M3), and search adapters (M4). CRDT evaluation is deferred until synchronization or collaboration requires it. This document remains the blueprint code is built and reviewed against; sections describing unbuilt parts are marked *(target)*. As code lands, this doc is updated to reflect *what is* rather than only *what is intended*. Phasing lives in the [roadmap](./ROADMAP.md); this doc is deliberately phasing-agnostic.
+Itala is **greenfield with M0 and M1 landed**: the `itala-kernel` (shared types, event bus, VFS port, config registry, capability policy, manifest model, durable `Kernel`, **history port**), `itala-plugin-api` (experimental `Plugin`/`PluginContext` contract), `itala-plugin-host` (discovery, loading, panic-contained lifecycle calls, capability checks + audit), `itala-vfs-fs` (local-filesystem adapter with file watching), **`itala-note`** (note data model, frontmatter parser), **`itala-vault`** (vault lifecycle, note CRUD, link rewriting, history integration), and **`itala-store-files`** (JSON-on-Vfs derived-state adapter, ADR-0004 §3) are implemented and verified end-to-end through the M1 integration suite. The first shell — **`apps/itala-cli`** (clap+tokio, MVP-α) — is wired through every port. Bounded contexts still to land: the M2 document engine, `itala-graph` (M3), and search adapters (M4). CRDT evaluation is deferred until synchronization or collaboration requires it. This document remains the blueprint code is built and reviewed against; sections describing unbuilt parts are marked *(target)*. As code lands, this doc is updated to reflect *what is* rather than only *what is intended*. Phasing lives in the [roadmap](./ROADMAP.md); this doc is deliberately phasing-agnostic.
 
 ---
 
@@ -388,7 +388,6 @@ The same kernel logic runs everywhere; shells and adapters adapt to platform cap
 |----------|--------|
 | What problem does Itala solve? | [VISION.md](./VISION.md) |
 | What is being built and when? | [ROADMAP.md](./ROADMAP.md) |
-| What does the product do (current-effort requirements)? | [specs/](./specs/) |
 | Why were specific choices made? | [adrs/](./adrs/) |
 | How is it built? (this doc) | [ARCHITECTURE.md](./ARCHITECTURE.md) |
 

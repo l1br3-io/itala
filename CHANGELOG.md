@@ -19,7 +19,6 @@ restored; visual diff/merge remains deferred.
   `history {list,show,restore}`.
 - Deferred: concurrent multi-vault sessions, diff/merge viewer UI, SQLite derived-state
   adapter, CRDT sync state.
-- Spec: [`docs/specs/m1-vaults-notes/`](./docs/specs/m1-vaults-notes/).
 - `just ci` green (145+ tests + a kernel-history suite).
 
 ## M0 — Foundation ✅
@@ -33,5 +32,4 @@ restarts.
 
 - Crates: `itala-kernel`, `itala-plugin-api`, `itala-plugin-host`, `itala-vfs-fs`.
 - No user-facing surface — verified entirely through tests.
-- Spec: [`docs/specs/m0-foundation/`](./docs/specs/m0-foundation/).
 - `just ci` green (73 tests + 12 doctests).
