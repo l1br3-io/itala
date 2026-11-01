@@ -36,6 +36,7 @@ ADRs are append-only. To change an accepted decision, write a new ADR that **sup
 | [0005](0005-plugin-trust-and-rollout.md) | Trusted native components now; sandboxed WASM extensions at M5 | Accepted |
 | [0006](0006-markdown-canonical-source.md) | Markdown is the canonical note representation | Accepted |
 | [0007](0007-best-effort-event-delivery.md) | Bounded best-effort events with explicit reconciliation | Accepted |
+| [0008](0008-pure-rust-platforms-and-mobile-ffi.md) | Pure Rust everywhere; native mobile shells consume the core via UniFFI | Accepted |
 
 ## Candidate ADRs (to be written as decisions crystallize)
 

@@ -24,8 +24,9 @@ Bounded contexts **never call each other directly**. They depend on the kernel a
 flowchart TB
     subgraph Shells["Shells — platform entry points"]
         CLI["itala-cli<br/>(MVP-α)"]
-        Desktop["itala-desktop — Tauri<br/>(MVP-β, target)"]
+        Desktop["itala-desktop — native Rust UI<br/>(MVP-β, target; iced or GPUI — ADR-0008)"]
         Web["itala-web — WASM<br/>(post-MVP, target)"]
+        Mobile["iOS / Android — native shells<br/>+ core via itala-ffi (UniFFI)"]
     end
 
     subgraph Plugins["Plugins — trusted native now; sandboxed WASM at M5"]
@@ -81,6 +82,7 @@ crates/
   itala-store-files/     # adapter: JSON-on-Vfs for derived-state ports (shipped in M1)
   itala-graph/           # bounded context (target): links, backlinks, mentions
   itala-vfs-fs/          # adapter: local-filesystem VFS backend
+  itala-ffi/             # adapter (target): UniFFI surface for native mobile shells — no logic, only type flattening (ADR-0008)
 
 apps/
   itala-cli/             # shell: CLI entry point (clap) — MVP-α (shipped in M1)
@@ -98,6 +100,7 @@ apps/
 | `itala-graph` *(target)* | `itala-kernel` | shells | Link index, backlinks, unlinked mentions. |
 | `itala-store-files` | `itala-kernel` | shells | JSON-on-Vfs adapter for derived-state ports (currently `DynHistoryStore`; grows with M3/M4). |
 | `itala-vfs-fs` | `itala-kernel` | shells | Local-filesystem VFS implementation + file watching. |
+| `itala-ffi` *(target)* | kernel, contexts | native mobile shells | Thin UniFFI foreign-function surface; every decision stays in the core — wrappers only flatten types and forward calls (ADR-0008). |
 | `itala-cli` | contexts, adapters, host | (top-level binary) | `clap`-based CLI; the first shipped shell (MVP-α). |
 
 > **Where does new code go?** A shared primitive → `itala-kernel`. A user-visible capability required for the coherent first-party product → a bounded context. A technology-specific implementation of a port → an adapter. A platform entry point → a shell under `apps/`. A proven extension that third parties can ship independently → a plugin, against `itala-plugin-api` only.
@@ -196,7 +199,7 @@ Plugin runtime policy is deliberately narrow:
 
 ### 4.3 Sandboxing & ABI *(target)*
 
-WASM plugins run with no host access except through granted capabilities — no ambient filesystem, network, or process access. The host/guest boundary is a versioned component contract; the `plugin-api` crate informs its Rust-side projection. Compatibility is experimental until the initial M5 surfaces have multiple real implementations. A concrete compatibility and deprecation policy is required before plugin API 1.0; indefinite side-by-side support for every historical ABI is not assumed.
+WASM plugins run with no host access except through granted capabilities — no ambient filesystem, network, or process access. The host/guest boundary is a versioned component contract; the `plugin-api` crate informs its Rust-side projection. The runtime itself is a **port** with a WIT-defined ABI and per-platform adapters (wasmtime natively; jco-transpiled components or wasmi on the web; wasmi if mobile ever hosts plugins — mobile shells do not host plugins at launch), so one plugin package runs on any conformant host (ADR-0008). Compatibility is experimental until the initial M5 surfaces have multiple real implementations. A concrete compatibility and deprecation policy is required before plugin API 1.0; indefinite side-by-side support for every historical ABI is not assumed.
 
 ### 4.4 Capabilities & permissions
 
@@ -340,10 +343,10 @@ The same kernel logic runs everywhere; shells and adapters adapt to platform cap
 | Platform | Shell | Language / bridge | UI layer | Storage |
 |----------|-------|-------------------|----------|---------|
 | CLI *(MVP-α)* | `itala-cli` | Rust | Terminal | Local filesystem |
-| Desktop *(MVP-β)* | `itala-desktop` | Rust (Tauri) | Webview (TypeScript) | Local filesystem |
-| Web *(post-MVP)* | `itala-web` | Rust → WASM | Browser DOM | IndexedDB / OPFS |
-| Android *(future)* | — | Kotlin + Rust (JNI) | Webview / native | Scoped storage |
-| iOS *(future)* | — | Swift + Rust (FFI) | Webview / native | App container / iCloud |
+| Desktop *(MVP-β)* | `itala-desktop` | Rust — native UI; **iced or GPUI chosen at kickoff via spikes** (ADR-0008); recorded fallback: Rust-authored webview (Tauri + Leptos / Dioxus) | Native Rust UI (wgpu) | Local filesystem |
+| Web *(post-MVP)* | `itala-web` | Rust → WASM (Leptos/Dioxus-class) | Browser DOM | IndexedDB / OPFS |
+| Android *(future)* | native app | Kotlin UI + Rust core via `itala-ffi` (UniFFI) | Jetpack Compose (native) | Scoped storage |
+| iOS *(future)* | native app | Swift UI + Rust core via `itala-ffi` (UniFFI) | SwiftUI (native) | App container / iCloud |
 
 ---
 
