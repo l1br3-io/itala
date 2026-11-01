@@ -31,7 +31,7 @@ default. Cite the relevant rule when providing review feedback.
 | Task | Read |
 |------|------|
 | Writing or reviewing any Rust code | `references/coding-style.md` + `references/patterns.md` |
-| `unsafe`, FFI, untrusted input (PTY output, env vars), secrets, dependency changes | add `references/security.md` |
+| `unsafe`, FFI, untrusted input (vault/note files, plugin-provided data, env vars), secrets, dependency changes | add `references/security.md` |
 | Writing or updating tests | add `references/testing.md` |
 | Performance work (only when performance is explicitly in scope) | add `references/performance.md` |
 
@@ -98,7 +98,10 @@ impl Connection<Connected> {
 
 ## Project gates
 
-Per `AGENTS.md`: `cargo clippy` and `cargo fmt --check` must pass before a
-change counts as done; `cargo test` is the verification gate. Runtime behavior
-is only testable on real COSMIC hardware — unit tests cover what can be tested
-headless.
+Per `AGENTS.md`: `just lint` (fmt --check + clippy `-D warnings`, workspace,
+all targets/features) and `just test` (cargo nextest + doctests) must pass
+before a change counts as done. `unsafe` is forbidden workspace-wide
+(`unsafe_code = "forbid"`) — FFI and plugin boundaries go through safe wrapper
+crates (`UniFFI` in `itala-ffi`, `wasmtime` in the plugin host), never
+hand-written `unsafe`. Keep verification output quiet per
+`.opencode/harness/rules/verification-commands.md`.
